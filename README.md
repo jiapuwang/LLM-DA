@@ -1,1 +1,1 @@
-# TKGC_LLM
+# Enhancing Temporal Knowledge Graph Reasoning with Large Language Models for Dynamic Online Adaptation
