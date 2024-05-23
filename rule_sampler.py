@@ -1,18 +1,13 @@
 import argparse
-import json
 import os
 
 import torch
 import numpy as np
 import time
 
-from data import *
-from multiprocessing import Pool
-from functools import partial
-from tqdm import tqdm
 from grapher import Grapher
 from rule_learning import Rule_Learner, rules_statistics
-from temporal_walk import Temporal_Walk, initialize_temporal_walk
+from temporal_walk import initialize_temporal_walk
 from joblib import Parallel, delayed
 from datetime import datetime
 
