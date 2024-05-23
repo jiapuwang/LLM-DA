@@ -17,6 +17,7 @@ from joblib import Parallel, delayed
 from datetime import datetime
 
 os.environ['CURL_CA_BUNDLE'] = ''
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -122,10 +123,12 @@ def main(parsed):
             rel = all_relations[k]
             for length in rule_lengths:
                 it_start = time.time()
-                process_rules_for_relation(rel, length, num_rules, use_relax_time)
+                process_rules_for_relation(rel, length, use_relax_time)
                 it_end = time.time()
                 it_time = round(it_end - it_start, 6)
+                num_rules.append(sum([len(v) for k, v in rl.rules_dict.items()]) // 2)
                 num_new_rules = num_rules[-1] - num_rules[-2]
+
                 print(
                     f"Process {i}: relation {k - relations_idx[0] + 1}/{len(relations_idx)}, length {length}: {it_time} sec, {num_new_rules} rules")
 
@@ -141,12 +144,11 @@ def main(parsed):
         else:
             return range(i * num_relations, len(all_relations))
 
-    def process_rules_for_relation(rel, length, num_rules, use_relax_time):
+    def process_rules_for_relation(rel, length, use_relax_time):
         for _ in range(num_walks):
             walk_successful, walk = temporal_walk.sample_walk(length + 1, rel, use_relax_time)
             if walk_successful:
                 rl.create_rule(walk, use_relax_time)
-                num_rules.append(sum([len(v) for k, v in rl.rules_dict.items()]) // 2)
 
     start = time.time()
     num_relations = len(all_relations) // num_processes
