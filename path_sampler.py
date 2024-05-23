@@ -12,7 +12,7 @@ from functools import partial
 from tqdm import tqdm
 from grapher import Grapher
 from rule_learning import Rule_Learner, rules_statistics
-from temporal_walk import Temporal_Walk
+from temporal_walk import Temporal_Walk, initialize_temporal_walk
 from joblib import Parallel, delayed
 from datetime import datetime
 
@@ -89,18 +89,7 @@ def main(parsed):
     dataset_dir = "./datasets/" + dataset + "/"
     data = Grapher(dataset_dir)
 
-    if version_id == 'train_valid':
-        temporal_walk = Temporal_Walk(np.array(data.train_idx.tolist() + data.valid_idx.tolist()), data.inv_relation_id,
-                                      transition_distr)
-    elif version_id == 'train':
-        temporal_walk = Temporal_Walk(np.array(data.train_idx.tolist()), data.inv_relation_id,
-                                      transition_distr)
-    elif version_id == 'test':
-        temporal_walk = Temporal_Walk(np.array(data.test_idx.tolist()), data.inv_relation_id,
-                                      transition_distr)
-    elif version_id == 'valid':
-        temporal_walk = Temporal_Walk(np.array(data.valid_idx.tolist()), data.inv_relation_id,
-                                      transition_distr)
+    temporal_walk = initialize_temporal_walk(version_id, data, transition_distr)
 
     rl = Rule_Learner(temporal_walk.edges, data.id2relation, data.inv_relation_id, dataset)
     all_relations = sorted(temporal_walk.edges)  # Learn for all relations
