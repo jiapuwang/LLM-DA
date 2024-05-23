@@ -1,13 +1,10 @@
 import argparse
 import json
 import os
-from difflib import get_close_matches
-import itertools
 
 import torch
 import numpy as np
 import time
-import rule_application as ra
 
 from data import *
 from multiprocessing import Pool
@@ -19,15 +16,13 @@ from temporal_walk import Temporal_Walk
 from joblib import Parallel, delayed
 from datetime import datetime
 
-
-
 os.environ['CURL_CA_BUNDLE'] = ''
 
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
+from params import str_to_bool
 
-from utils import load_json_data, save_json_data, construct_adjacency_list_and_index, subgraph_extraction_labeling, \
-    calculate_hours_between_dates_pandas
+from utils import load_json_data, save_json_data
 
 
 def sample_paths(max_path_len, anchor_num, fact_rdf, entity2desced, rdict, cores, output_path):
@@ -116,16 +111,6 @@ def main(parsed):
 
     constant_config = load_json_data('./Config/constant.json')
     relation_regex = constant_config['relation_regex'][dataset]
-
-    # relation_graph_file = f'relation_subgraph.json'
-    # relation_graph_file_path = os.path.join(rl.output_dir, relation_graph_file)
-    #
-    # if not os.path.exists(relation_graph_file_path):
-    #     num_entities = len(data.entity2id.keys())
-    #     adj_list, relation_index = construct_adjacency_list_and_index(
-    #         (data.train_idx.tolist() + data.valid_idx.tolist()),
-    #         list(data.relation2id.values()), num_entities)
-    #     gen_subgraph_based_relation(adj_list, all_relations, data, num_processes, relation_graph_file_path, seed)
 
     def learn_rules(i, num_relations):
         """
@@ -258,91 +243,6 @@ def main(parsed):
     save_json_data(rl.rules_dict, rl.output_dir + 'confidence.json')
     rules_statistics(rl.rules_dict)
     rl.save_rules_verbalized(dt, rule_lengths, num_walks, transition_distr, seed, rel2idx, relation_regex)
-
-
-def gen_subgraph_based_relation(adj_list, all_relations, data, num_processes, relation_graph_file_path, seed):
-    all_data = np.array(data.train_idx.tolist() + data.valid_idx.tolist())
-    all_data = all_data[(all_data[:, 3] > 0)]
-    relation_triple = {}
-    for relation in data.id2relation.keys():
-        mask = (all_data[:, 1] == relation) * (all_data[:, 0] != all_data[:, 2])
-        triple_list = all_data[mask].tolist()
-        relation_triple.setdefault(relation, []).extend(random.sample(triple_list, min(5, len(triple_list))))
-
-    def gen_subgraph_for_multi_thread(i, num_relations, adj_list, data, relation_triple, seed):
-        """
-        Learn rules (multiprocessing possible).
-
-        Parameters:
-            i (int): process number
-            num_relations (int): minimum number of relations for each process
-
-        Returns:
-            rl.rules_dict (dict): rules dictionary
-        """
-
-        if seed:
-            np.random.seed(seed)
-
-        num_rest_relations = len(all_relations) - (i + 1) * num_relations
-        if num_rest_relations >= num_relations:
-            relations_idx = range(i * num_relations, (i + 1) * num_relations)
-        else:
-            relations_idx = range(i * num_relations, len(all_relations))
-
-        relation_subgraph = {}
-        for idx in relations_idx:
-            relation_id = all_relations[idx]
-            gen_subgraph(adj_list, data, relation_triple[relation_id], relation_id, relation_subgraph)
-            print(f"Process {i}: relation {idx - relations_idx[0] + 1}/{len(relations_idx)}")
-
-        return relation_subgraph
-
-    start = time.time()
-    num_relations = len(all_relations) // num_processes
-    output = Parallel(n_jobs=num_processes)(
-        delayed(gen_subgraph_for_multi_thread)(i, num_relations, adj_list, data, relation_triple, seed) for i in
-        range(num_processes)
-    )
-    end = time.time()
-    all_graph = output[0]
-    for i in range(1, num_processes):
-        all_graph.update(output[i])
-    total_time = round(end - start, 6)
-    print("Generate Subgraph in {} seconds.".format(total_time))
-    save_json_data(all_graph, relation_graph_file_path)
-
-
-def gen_subgraph(adj_list, data, triples, relation_id, relation_subgraph):
-    for triple in triples:
-        ind = (triple[0], triple[2])
-        ind_key = f'{triple[0]}_{triple[2]}'
-        current_ts = triple[3]
-        subgraph_edges = []
-        temp_dict = {}
-        subgraph_nodes = subgraph_extraction_labeling(ind, adj_list, kind="intersection", h=2, max_nodes_per_hop=50)
-        for idx, subject_object in enumerate(subgraph_nodes):
-            result = ra.get_window_edges_for_subject_object(
-                np.array(data.train_idx.tolist() + data.valid_idx.tolist()),
-                current_ts, subject_object, window=0)
-            if len(result):
-                result.append(triple)
-                subgraph_edges.extend(result)
-
-        if len(subgraph_edges):
-            temp_dict.setdefault(ind_key, []).extend(subgraph_edges)
-            relation_subgraph.setdefault(relation_id, []).append(temp_dict)
-
-
-def str_to_bool(value):
-    if isinstance(value, bool):
-        return value
-    if value.lower() in ('yes', 'true', 't', 'y', '1'):
-        return True
-    elif value.lower() in ('no', 'false', 'f', 'n', '0'):
-        return False
-    else:
-        raise argparse.ArgumentTypeError('Boolean value expected.')
 
 
 if __name__ == '__main__':
