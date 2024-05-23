@@ -2,6 +2,15 @@ import numpy as np
 import pandas as pd
 
 
+def initialize_temporal_walk(version_id, data, transition_distr):
+    idx_map = {
+        'train_valid': np.array(data.train_idx.tolist() + data.valid_idx.tolist()),
+        'train': np.array(data.train_idx.tolist()),
+        'test': np.array(data.test_idx.tolist()),
+        'valid': np.array(data.valid_idx.tolist())
+    }
+    return Temporal_Walk(idx_map[version_id], data.inv_relation_id, transition_distr)
+
 class Temporal_Walk(object):
     def __init__(self, learn_data, inv_relation_id, transition_distr):
         """
