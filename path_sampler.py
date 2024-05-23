@@ -101,99 +101,54 @@ def main(parsed):
     constant_config = load_json_data('./Config/constant.json')
     relation_regex = constant_config['relation_regex'][dataset]
 
-    def learn_rules(i, num_relations):
+    def learn_rules(i, num_relations, use_relax_time=False):
         """
-        Learn rules (multiprocessing possible).
+        Learn rules with optional relax time (multiprocessing possible).
 
         Parameters:
             i (int): process number
             num_relations (int): minimum number of relations for each process
+            use_relax_time (bool): Whether to use relax time in sampling
 
         Returns:
             rl.rules_dict (dict): rules dictionary
         """
 
-        print("Start process", i, "...")
-
-        if seed:
-            np.random.seed(seed)
-
-        if i < num_processes - 1:
-            relations_idx = range(i * num_relations, (i + 1) * num_relations)
-        else:
-            relations_idx = range(i * num_relations, len(all_relations))
-
+        set_seed_if_provided()
+        relations_idx = calculate_relations_idx(i, num_relations)
         num_rules = [0]
+
         for k in relations_idx:
             rel = all_relations[k]
             for length in rule_lengths:
                 it_start = time.time()
-                for _ in range(num_walks):
-                    walk_successful, walk = temporal_walk.sample_walk(length + 1, rel)
-                    if walk_successful:
-                        rl.create_rule(walk)
+                process_rules_for_relation(rel, length, num_rules, use_relax_time)
                 it_end = time.time()
                 it_time = round(it_end - it_start, 6)
-                num_rules.append(sum([len(v) for k, v in rl.rules_dict.items()]) // 2)
                 num_new_rules = num_rules[-1] - num_rules[-2]
                 print(
-                    "Process {0}: relation {1}/{2}, length {3}: {4} sec, {5} rules".format(
-                        i,
-                        k - relations_idx[0] + 1,
-                        len(relations_idx),
-                        length,
-                        it_time,
-                        num_new_rules,
-                    )
-                )
+                    f"Process {i}: relation {k - relations_idx[0] + 1}/{len(relations_idx)}, length {length}: {it_time} sec, {num_new_rules} rules")
 
         return rl.rules_dict
 
-    def learn_rules_with_relax_time(i, num_relations):
-        """
-        Learn rules (multiprocessing possible).
-
-        Parameters:
-            i (int): process number
-            num_relations (int): minimum number of relations for each process
-
-        Returns:
-            rl.rules_dict (dict): rules dictionary
-        """
-
+    def set_seed_if_provided():
         if seed:
             np.random.seed(seed)
 
+    def calculate_relations_idx(i, num_relations):
         if i < num_processes - 1:
-            relations_idx = range(i * num_relations, (i + 1) * num_relations)
+            return range(i * num_relations, (i + 1) * num_relations)
         else:
-            relations_idx = range(i * num_relations, len(all_relations))
+            return range(i * num_relations, len(all_relations))
 
-        num_rules = [0]
-        for k in relations_idx:
-            rel = all_relations[k]
-            for length in rule_lengths:
-                it_start = time.time()
-                for _ in range(num_walks):
-                    walk_successful, walk = temporal_walk.sample_walk_with_relax_time(length + 1, rel)
-                    if walk_successful:
-                        rl.create_rule_with_relax_time(walk)
-                it_end = time.time()
-                it_time = round(it_end - it_start, 6)
+    def process_rules_for_relation(rel, length, num_rules, use_relax_time):
+        sample_method = temporal_walk.sample_walk_with_relax_time if use_relax_time else temporal_walk.sample_walk
+        for _ in range(num_walks):
+            walk_successful, walk = sample_method(length + 1, rel)
+            if walk_successful:
+                rule_method = rl.create_rule_with_relax_time if use_relax_time else rl.create_rule
+                rule_method(walk)
                 num_rules.append(sum([len(v) for k, v in rl.rules_dict.items()]) // 2)
-                num_new_rules = num_rules[-1] - num_rules[-2]
-                print(
-                    "Process {0}: relation {1}/{2}, length {3}: {4} sec, {5} rules".format(
-                        i,
-                        k - relations_idx[0] + 1,
-                        len(relations_idx),
-                        length,
-                        it_time,
-                        num_new_rules,
-                    )
-                )
-
-        return rl.rules_dict
 
     if parsed['is_relax_time'] is False:
         start = time.time()
