@@ -289,19 +289,11 @@ class Rule_Learner(object):
 
         all_bodies = []
         for _ in range(num_samples):
-
-            if is_relax_time is False:
-                sample_successful, body_ents_tss = self.sample_body(
-                    rule["body_rels"], rule["var_constraints"]
-                )
-                if sample_successful:
-                    all_bodies.append(body_ents_tss)
-            else:
-                sample_successful, body_ents_tss = self.sample_body_with_relax_time(
-                    rule["body_rels"], rule["var_constraints"]
-                )
-                if sample_successful:
-                    all_bodies.append(body_ents_tss)
+            sample_successful, body_ents_tss = self.sample_body(
+                rule["body_rels"], rule["var_constraints"], is_relax_time
+            )
+            if sample_successful:
+                all_bodies.append(body_ents_tss)
 
         all_bodies.sort()
         unique_bodies = list(x for x, _ in itertools.groupby(all_bodies))
@@ -314,7 +306,7 @@ class Rule_Learner(object):
 
         return confidence, rule_support, body_support
 
-    def sample_body(self, body_rels, var_constraints):
+    def sample_body(self, body_rels, var_constraints, use_relax_time=False):
         """
         Sample a walk according to the rule body.
         The sequence of timesteps should be non-decreasing.
@@ -322,6 +314,7 @@ class Rule_Learner(object):
         Parameters:
             body_rels (list): relations in the rule body
             var_constraints (list): variable constraints for the entities
+            use_relax_time (bool): whether to use relaxed time sampling
 
         Returns:
             sample_successful (bool): if a body has been successfully sampled
@@ -342,58 +335,11 @@ class Rule_Learner(object):
 
         for cur_rel in body_rels[1:]:
             next_edges = self.edges[cur_rel]
-            mask = (next_edges[:, 0] == cur_node) * (next_edges[:, 3] >= cur_ts)
-            filtered_edges = next_edges[mask]
-
-            if len(filtered_edges):
-                next_edge = filtered_edges[np.random.choice(len(filtered_edges))]
-                cur_ts = next_edge[3]
-                cur_node = next_edge[2]
-                body_ents_tss.append(cur_ts)
-                body_ents_tss.append(cur_node)
+            if use_relax_time:
+                mask = (next_edges[:, 0] == cur_node)
             else:
-                sample_successful = False
-                break
+                mask = (next_edges[:, 0] == cur_node) * (next_edges[:, 3] >= cur_ts)
 
-        if sample_successful and var_constraints:
-            # Check variable constraints
-            body_var_constraints = self.define_var_constraints(body_ents_tss[::2])
-            if body_var_constraints != var_constraints:
-                sample_successful = False
-
-        return sample_successful, body_ents_tss
-
-
-    def sample_body_with_relax_time(self, body_rels, var_constraints):
-        """
-        Sample a walk according to the rule body.
-        The sequence of timesteps should be non-decreasing.
-
-        Parameters:
-            body_rels (list): relations in the rule body
-            var_constraints (list): variable constraints for the entities
-
-        Returns:
-            sample_successful (bool): if a body has been successfully sampled
-            body_ents_tss (list): entities and timestamps (alternately entity and timestamp)
-                                  of the sampled body
-        """
-
-        sample_successful = True
-        body_ents_tss = []
-        cur_rel = body_rels[0]
-        rel_edges = self.edges[cur_rel]
-        next_edge = rel_edges[np.random.choice(len(rel_edges))]
-        cur_ts = next_edge[3]
-        cur_node = next_edge[2]
-        body_ents_tss.append(next_edge[0])
-        body_ents_tss.append(cur_ts)
-        body_ents_tss.append(cur_node)
-
-        for cur_rel in body_rels[1:]:
-            next_edges = self.edges[cur_rel]
-            # mask = (next_edges[:, 0] == cur_node) * (next_edges[:, 3] >= cur_ts)
-            mask = (next_edges[:, 0] == cur_node)
             filtered_edges = next_edges[mask]
 
             if len(filtered_edges):
