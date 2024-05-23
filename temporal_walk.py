@@ -76,7 +76,7 @@ class Temporal_Walk(object):
 
         return next_edge
 
-    def transition_step(self, cur_node, cur_ts, prev_edge, start_node, step, L):
+    def transition_step(self, cur_node, cur_ts, prev_edge, start_node, step, L, target_cur_ts=None):
         """
         Sample a neighboring edge given the current node and timestamp.
         In the second step (step == 1), the next timestamp should be smaller than the current timestamp.
@@ -91,17 +91,20 @@ class Temporal_Walk(object):
             start_node (int): start node
             step (int): number of current step
             L (int): length of random walk
+            target_cur_ts (int, optional): target current timestamp for relaxed time. Defaults to cur_ts.
 
         Returns:
             next_edge (np.ndarray): next edge
         """
 
         next_edges = self.neighbors[cur_node]
+        if target_cur_ts is None:
+            target_cur_ts = cur_ts
 
         if step == 1:  # The next timestamp should be smaller than the current timestamp
-            filtered_edges = next_edges[next_edges[:, 3] < cur_ts]
+            filtered_edges = next_edges[next_edges[:, 3] < target_cur_ts]
         else:  # The next timestamp should be smaller than or equal to the current timestamp
-            filtered_edges = next_edges[next_edges[:, 3] <= cur_ts]
+            filtered_edges = next_edges[next_edges[:, 3] <= target_cur_ts]
             # Delete inverse edge
             inv_edge = [
                 cur_node,
@@ -121,15 +124,10 @@ class Temporal_Walk(object):
             next_edge = []
 
         return next_edge
-
 
     def transition_step_with_relax_time(self, cur_node, cur_ts, prev_edge, start_node, step, L, target_cur_ts):
         """
-        Sample a neighboring edge given the current node and timestamp.
-        In the second step (step == 1), the next timestamp should be smaller than the current timestamp.
-        In the other steps, the next timestamp should be smaller than or equal to the current timestamp.
-        In the last step (step == L-1), the edge should connect to the source of the walk (cyclic walk).
-        It is not allowed to go back using the inverse edge.
+        Wrapper for transition_step with relaxed time handling.
 
         Parameters:
             cur_node (int): current node
@@ -138,85 +136,21 @@ class Temporal_Walk(object):
             start_node (int): start node
             step (int): number of current step
             L (int): length of random walk
+            target_cur_ts (int): target current timestamp for relaxed time
 
         Returns:
             next_edge (np.ndarray): next edge
         """
+        return self.transition_step(cur_node, cur_ts, prev_edge, start_node, step, L, target_cur_ts)
 
-        next_edges = self.neighbors[cur_node]
-
-        if step == 1:  # The next timestamp should be smaller than the current timestamp
-            filtered_edges = next_edges[next_edges[:, 3] < target_cur_ts]
-        else:  # The next timestamp should be smaller than or equal to the current timestamp
-            filtered_edges = next_edges[next_edges[:, 3] < target_cur_ts]
-            # Delete inverse edge
-            inv_edge = [
-                cur_node,
-                self.inv_relation_id[prev_edge[1]],
-                prev_edge[0],
-                cur_ts,
-            ]
-            row_idx = np.where(np.all(filtered_edges == inv_edge, axis=1))
-            filtered_edges = np.delete(filtered_edges, row_idx, axis=0)
-
-        if step == L - 1:  # Find an edge that connects to the source of the walk
-            filtered_edges = filtered_edges[filtered_edges[:, 2] == start_node]
-
-        if len(filtered_edges):
-            next_edge = self.sample_next_edge(filtered_edges, cur_ts)
-        else:
-            next_edge = []
-
-        return next_edge
-
-    def sample_walk(self, L, rel_idx):
+    def sample_walk(self, L, rel_idx, use_relax_time=False):
         """
         Try to sample a cyclic temporal random walk of length L (for a rule of length L-1).
 
         Parameters:
             L (int): length of random walk
             rel_idx (int): relation index
-
-        Returns:
-            walk_successful (bool): if a cyclic temporal random walk has been successfully sampled
-            walk (dict): information about the walk (entities, relations, timestamps)
-        """
-
-        walk_successful = True
-        walk = dict()
-        prev_edge = self.sample_start_edge(rel_idx)
-        start_node = prev_edge[0]
-        cur_node = prev_edge[2]
-        cur_ts = prev_edge[3]
-        walk["entities"] = [start_node, cur_node]
-        walk["relations"] = [prev_edge[1]]
-        walk["timestamps"] = [cur_ts]
-
-        for step in range(1, L):
-            next_edge = self.transition_step(
-                cur_node, cur_ts, prev_edge, start_node, step, L
-            )
-            if len(next_edge):
-                cur_node = next_edge[2]
-                cur_ts = next_edge[3]
-                walk["relations"].append(next_edge[1])
-                walk["entities"].append(cur_node)
-                walk["timestamps"].append(cur_ts)
-                prev_edge = next_edge
-            else:  # No valid neighbors (due to temporal or cyclic constraints)
-                walk_successful = False
-                break
-
-        return walk_successful, walk
-
-
-    def sample_walk_with_relax_time(self, L, rel_idx):
-        """
-        Try to sample a cyclic temporal random walk of length L (for a rule of length L-1).
-
-        Parameters:
-            L (int): length of random walk
-            rel_idx (int): relation index
+            use_relax_time (bool): whether to use relaxed time sampling
 
         Returns:
             walk_successful (bool): if a cyclic temporal random walk has been successfully sampled
@@ -235,9 +169,15 @@ class Temporal_Walk(object):
         walk["timestamps"] = [cur_ts]
 
         for step in range(1, L):
-            next_edge = self.transition_step_with_relax_time(
-                cur_node, cur_ts, prev_edge, start_node, step, L, target_cur_ts
-            )
+            if use_relax_time:
+                next_edge = self.transition_step_with_relax_time(
+                    cur_node, cur_ts, prev_edge, start_node, step, L, target_cur_ts
+                )
+            else:
+                next_edge = self.transition_step(
+                    cur_node, cur_ts, prev_edge, start_node, step, L
+                )
+
             if len(next_edge):
                 cur_node = next_edge[2]
                 cur_ts = next_edge[3]
