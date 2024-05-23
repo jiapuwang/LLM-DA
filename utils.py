@@ -314,6 +314,11 @@ def save_json_data(data, file_path):
     except Exception as e:
         print(f"Error saving JSON data to {file_path}: {e}")
 
+
+def write_to_file(content, path):
+    with open(path, "w", encoding="utf-8") as fout:
+        fout.write(content)
+
 def stat_ranks(rank_list, method='filter'):
     hits = [1, 3, 10]
     total_rank = torch.cat(rank_list)

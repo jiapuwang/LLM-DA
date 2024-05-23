@@ -26,32 +26,6 @@ from params import str_to_bool
 from utils import load_json_data, save_json_data
 
 
-def sample_paths(max_path_len, anchor_num, fact_rdf, entity2desced, rdict, cores, output_path):
-    print("Sampling training data...")
-    print("Number of head relation:{}".format((rdict.__len__() - 1) // 2))
-    # print("Maximum paths per head: {}".format(anchor_num))
-    fact_dict = construct_fact_dict(fact_rdf)
-    with open(os.path.join(output_path, "closed_rel_paths.jsonl"), "w") as f:
-        for head in tqdm(rdict.rel2idx):
-            paths = set()
-            if head == "None" or "inv_" in head:
-                continue
-            # Sample anchor
-            sampled_rdf = sample_anchor_rdf(fact_dict[head], num=anchor_num)
-            with Pool(cores) as p:
-                for path_seq in p.map(
-                        partial(search_closed_rel_paths, entity2desced=entity2desced, max_path_len=max_path_len),
-                        sampled_rdf):
-                    paths = paths.union(set(path_seq))
-            paths = list(paths)
-            tqdm.write("Head relation: {}".format(head))
-            tqdm.write("Number of paths: {}".format(len(paths)))
-            tqdm.write("Saving paths...")
-            json.dump({"head": head, "paths": paths}, f)
-            f.write("\n")
-            f.flush()
-
-
 def select_similary_relations(relation2id, output_dir):
     id2relation = dict([(v, k) for k, v in relation2id.items()])
 
