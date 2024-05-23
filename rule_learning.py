@@ -41,7 +41,7 @@ class Rule_Learner(object):
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
 
-    def create_rule(self, walk, confidence=0):
+    def create_rule(self, walk, confidence=0, use_relax_time=False):
         """
         Create a rule given a cyclic temporal random walk.
         The rule contains information about head relation, body relations,
@@ -53,6 +53,8 @@ class Rule_Learner(object):
         Parameters:
             walk (dict): cyclic temporal random walk
                          {"entities": list, "relations": list, "timestamps": list}
+            confidence (float): confidence value
+            use_relax_time (bool): whether the rule is created with relaxed time
 
         Returns:
             rule (dict): created rule
@@ -73,46 +75,7 @@ class Rule_Learner(object):
                 rule["conf"],
                 rule["rule_supp"],
                 rule["body_supp"],
-            ) = self.estimate_confidence(rule)
-
-            rule["llm_confidence"] = confidence
-
-            if rule["conf"] or confidence:
-                self.update_rules_dict(rule)
-
-    def create_rule_with_relax_time(self, walk, confidence=0):
-        """
-        Create a rule given a cyclic temporal random walk.
-        The rule contains information about head relation, body relations,
-        variable constraints, confidence, rule support, and body support.
-        A rule is a dictionary with the content
-        {"head_rel": int, "body_rels": list, "var_constraints": list,
-         "conf": float, "rule_supp": int, "body_supp": int}
-
-        Parameters:
-            walk (dict): cyclic temporal random walk
-                         {"entities": list, "relations": list, "timestamps": list}
-
-        Returns:
-            rule (dict): created rule
-        """
-
-        rule = dict()
-        rule["head_rel"] = int(walk["relations"][0])
-        rule["body_rels"] = [
-            self.inv_relation_id[x] for x in walk["relations"][1:][::-1]
-        ]
-        rule["var_constraints"] = self.define_var_constraints(
-            walk["entities"][1:][::-1]
-        )
-
-        if rule not in self.found_rules:
-            self.found_rules.append(rule.copy())
-            (
-                rule["conf"],
-                rule["rule_supp"],
-                rule["body_supp"],
-            ) = self.estimate_confidence(rule,is_relax_time=True)
+            ) = self.estimate_confidence(rule, is_relax_time=use_relax_time)
 
             rule["llm_confidence"] = confidence
 

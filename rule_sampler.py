@@ -145,8 +145,7 @@ def main(parsed):
         for _ in range(num_walks):
             walk_successful, walk = temporal_walk.sample_walk(length + 1, rel, use_relax_time)
             if walk_successful:
-                rule_method = rl.create_rule_with_relax_time if use_relax_time else rl.create_rule
-                rule_method(walk)
+                rl.create_rule(walk, use_relax_time)
                 num_rules.append(sum([len(v) for k, v in rl.rules_dict.items()]) // 2)
 
     start = time.time()
