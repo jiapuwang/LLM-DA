@@ -150,34 +150,18 @@ def main(parsed):
                 rule_method(walk)
                 num_rules.append(sum([len(v) for k, v in rl.rules_dict.items()]) // 2)
 
-    if parsed['is_relax_time'] is False:
-        start = time.time()
-        num_relations = len(all_relations) // num_processes
-        output = Parallel(n_jobs=num_processes)(
-            delayed(learn_rules)(i, num_relations) for i in range(num_processes)
-        )
-        end = time.time()
-        all_graph = output[0]
-        for i in range(1, num_processes):
-            all_graph.update(output[i])
+    start = time.time()
+    num_relations = len(all_relations) // num_processes
+    output = Parallel(n_jobs=num_processes)(
+        delayed(learn_rules)(i, num_relations, parsed['is_relax_time']) for i in range(num_processes)
+    )
+    end = time.time()
+    all_graph = output[0]
+    for i in range(1, num_processes):
+        all_graph.update(output[i])
 
-        total_time = round(end - start, 6)
-        print("Learning finished in {} seconds.".format(total_time))
-
-    else:
-
-        start = time.time()
-        num_relations = len(all_relations) // num_processes
-        output = Parallel(n_jobs=num_processes)(
-            delayed(learn_rules_with_relax_time)(i, num_relations) for i in range(num_processes)
-        )
-        end = time.time()
-        all_graph = output[0]
-        for i in range(1, num_processes):
-            all_graph.update(output[i])
-
-        total_time = round(end - start, 6)
-        print("Learning finished in {} seconds.".format(total_time))
+    total_time = round(end - start, 6)
+    print("Learning finished in {} seconds.".format(total_time))
 
     rl.rules_dict = all_graph
     rl.sort_rules_dict()
