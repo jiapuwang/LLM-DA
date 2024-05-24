@@ -26,7 +26,7 @@ python reasoning.py -d ${DATASET} -r confidence.json -l 1 2 3 -p 8 --min_conf 0.
 ```
 5. Evaluate
 ```
-python evaluate.py --dataset icews14 -c 'llm_test_apply_all_conf_cands_r[1,2,3]_w0_score_12[0.1,0.5,'\''TLogic'\'',0.0,0.01,0]_top_20_et_origin.json' --graph_reasoning_type TiRGN --rule_weight 0.9
+python evaluate.py -d ${DATASET} -c 'llm_test_apply_all_conf_cands_r[1,2,3]_w0_score_12[0.1,0.5,'\''TLogic'\'',0.0,0.01,0]_top_20_et_origin.json' --graph_reasoning_type TiRGN --rule_weight 0.9
 ```
 
 ## Results
