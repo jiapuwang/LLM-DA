@@ -85,7 +85,7 @@ def get_candidates(parsed, test_query, all_rule_candidates, i, num_entities, tes
     score = score_numpy[indices[0]]
     regcn_candidates = {index: value for index, value in enumerate(score)}
 
-    candidates = {k: (1 - parsed.freq_weight) * regcn_candidates[k] + parsed.freq_weight * rule_candidates[k] for k in
+    candidates = {k: (1 - parsed.rule_weight) * regcn_candidates[k] + parsed.rule_weight * rule_candidates[k] for k in
                   rule_candidates}
     return candidates
 
