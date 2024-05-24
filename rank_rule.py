@@ -3,11 +3,11 @@ import argparse
 import glob
 import re
 import traceback
-import numpy as np
 
 from grapher import Grapher
+from params import str_to_bool
 from rule_learning import Rule_Learner, rules_statistics
-from temporal_walk import Temporal_Walk
+from temporal_walk import initialize_temporal_walk
 from utils import save_json_data, load_json_data
 
 
@@ -40,26 +40,6 @@ def get_walk(rule, relation2id, inv_relation_id, regex):
     }
 
     return result
-
-
-def calculate_confidence_original(rule_path, relation2id, inv_relation_id, rl, relation_regex, rules_var_dict, is_merge):
-    llm_gen_rules_list = []
-    for input_filepath in glob.glob(os.path.join(rule_path, "*_cleaned_rules.txt")):
-        with open(input_filepath, 'r') as f:
-            rules = f.readlines()
-            for i_, rule in enumerate(rules):
-                try:
-                    confidence = float(rule.split('&')[-1].strip())
-                    temp_rule = rule.split('&')[:-1]
-                    rule_without_confidence = '&'.join(temp_rule)
-                    walk = get_walk(rule_without_confidence, relation2id, inv_relation_id, relation_regex)
-                    rl.create_rule_for_merge(walk, confidence, rule_without_confidence, rules_var_dict, is_merge)
-                    llm_gen_rules_list.append(rule_without_confidence)
-                except Exception as e:
-                    print(f"Error processing rule: {rule}")
-                    traceback.print_exc()  # 打印异常的详细信息和调用栈
-
-    return llm_gen_rules_list
 
 def calculate_confidence(rule_path, relation2id, inv_relation_id, rl, relation_regex, rules_var_dict, is_merge, is_has_confidence=False, is_relax_time=False):
     llm_gen_rules_list = []
@@ -107,25 +87,13 @@ def calculate_confidence(rule_path, relation2id, inv_relation_id, rl, relation_r
 
 def main(args):
     is_merge = args.is_merge
-    dataset_dir = "./datasets/" + args.dataset + "/"
+    dataset_dir = os.path.join(".","datasets", args.dataset)
     data = Grapher(dataset_dir)
-    if args.bgkg == 'train_valid':
-        temporal_walk = Temporal_Walk(np.array(data.train_idx.tolist() + data.valid_idx.tolist()), data.inv_relation_id,
-                                      args.transition_distr)
-    elif args.bgkg == 'all':
-        temporal_walk = Temporal_Walk(
-            np.array(data.train_idx.tolist() + data.valid_idx.tolist() + data.test_idx.tolist()), data.inv_relation_id,
-            args.transition_distr)
-    elif args.bgkg == 'test':
-        temporal_walk = Temporal_Walk(np.array(data.test_idx.tolist()), data.inv_relation_id, args.transition_distr)
-    else:
-        temporal_walk = Temporal_Walk(np.array(data.train_idx.tolist()), data.inv_relation_id, args.transition_distr)
+
+    temporal_walk = initialize_temporal_walk(args.bgkg, data, args.transition_distr)
 
     rl = Rule_Learner(temporal_walk.edges, data.id2relation, data.inv_relation_id, args.dataset)
-    if args.is_iteration is False:
-        rule_path = os.path.join('clean_rules', args.dataset, args.p, args.model_name)
-    else:
-        rule_path = os.path.join('gen_rules_iteration', args.dataset, 'final_summary')
+    rule_path = os.path.join('gen_rules_iteration', args.dataset, 'final_summary')
 
     constant_config = load_json_data('./Config/constant.json')
     relation_regex = constant_config['relation_regex'][args.dataset]
@@ -133,18 +101,8 @@ def main(args):
     rules_var_path = os.path.join("sampled_path", args.dataset, "original", "rules_var.json")
     rules_var_dict = load_json_data(rules_var_path)
 
-    if args.is_only_with_original_rules:
-        for key, value in rules_var_dict.items():
-            temp_var = {}
-            temp_var['head_rel'] = value['head_rel']
-            temp_var['body_rels'] = value['body_rels']
-            temp_var["var_constraints"] = value["var_constraints"]
-            if temp_var not in rl.original_found_rules:
-                rl.original_found_rules.append(temp_var.copy())
-                rl.update_rules_dict(value)
-                rl.num_original  += 1
-    else:
-        llm_gen_rules_list = calculate_confidence(rule_path, data.relation2id, data.inv_relation_id, rl,
+
+    llm_gen_rules_list = calculate_confidence(rule_path, data.relation2id, data.inv_relation_id, rl,
                                                   relation_regex, rules_var_dict, is_merge, is_relax_time=args.is_relax_time)
 
     save_rules(args, rules_var_dict, rl, llm_gen_rules_list, is_merge)
@@ -177,19 +135,7 @@ def save_rules(args, rules_var_dict, rl, llm_gen_rules_list, is_merge):
     confidence_file_path = os.path.join(dir_path, confidence_file_name)
     save_json_data(rl.rules_dict, confidence_file_path)
 
-
-def str_to_bool(value):
-    if isinstance(value, bool):
-        return value
-    if value.lower() in ('yes', 'true', 't', 'y', '1'):
-        return True
-    elif value.lower() in ('no', 'false', 'f', 'n', '0'):
-        return False
-    else:
-        raise argparse.ArgumentTypeError('Boolean value expected.')
-
-
-if __name__ == "__main__":
+def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", default="family")
     parser.add_argument('--model_name', default='none', help='model name',
@@ -207,6 +153,8 @@ if __name__ == "__main__":
     parser.add_argument("--bgkg", default="train", type=str,
                         choices=['train', 'train_valid', 'all', 'test'])
     parser.add_argument("--is_relax_time", default='no', type=str_to_bool)
-    args = parser.parse_args()
+    return parser.parse_args()
 
+if __name__ == "__main__":
+    args = parse_arguments()
     main(args)

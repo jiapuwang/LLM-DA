@@ -4,6 +4,7 @@ import pandas as pd
 
 def initialize_temporal_walk(version_id, data, transition_distr):
     idx_map = {
+        'all':np.array(data.train_idx.tolist() + data.valid_idx.tolist()+data.test_idx.tolist()),
         'train_valid': np.array(data.train_idx.tolist() + data.valid_idx.tolist()),
         'train': np.array(data.train_idx.tolist()),
         'test': np.array(data.test_idx.tolist()),
