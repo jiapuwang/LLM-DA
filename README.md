@@ -21,13 +21,23 @@ Set your OpenAI API key in `.env` file
 ```
 python rule_sampler.py -d ${DATASET} -m 3 -n 200 -p 16 -s 12 --is_relax_time No
 ```
+2. Rule Generation & Dynamic Adaptation
+```
+python Iteration_reasoning.py -d ${DATASET} --model_name gpt-3.5-turbo-0125 -f 50 -l 5 --is_rel_name Yes 
+```
+
+3. Rank Rules
+```
+python reasoning.py -p copy_gpt-3.5-turbo-0125-top-0-f-10-l-10 -d ${DATASET} 
+```
+
 4.  Candidate Reasoning
 ```
 python reasoning.py -d ${DATASET} -r confidence.json -l 1 2 3 -p 8 --min_conf 0.01 --weight_0 0.5 --gpu 0 --top_k 20 --window 0
 ```
 5. Evaluate
 ```
-python evaluate.py --dataset icews14 -c 'llm_test_apply_all_conf_cands_r[1,2,3]_w0_score_12[0.1,0.5,'\''TLogic'\'',0.0,0.01,0]_top_20_et_origin.json' --graph_reasoning_type TiRGN --rule_weight 0.9
+python evaluate.py -d ${DATASET} -c 'llm_test_apply_all_conf_cands_r[1,2,3]_w0_score_12[0.1,0.5,'\''TLogic'\'',0.0,0.01,0]_top_20_et_origin.json' --graph_reasoning_type TiRGN --rule_weight 0.9
 ```
 
 ## Results
