@@ -141,16 +141,14 @@ def parse_arguments():
     parser.add_argument('--model_name', default='none', help='model name',
                         choices=['none', 'gpt-4', 'gpt-3.5-turbo', 'gpt-3.5-turbo-16k'])
     parser.add_argument("-p", default="gpt-3.5-turbo-top-0-f-5-l-3")
-    parser.add_argument("--eval_mode", choices=['all', "test", 'fact'], default="all",
-                        help="evaluate on all or only test set")
     parser.add_argument("--input_path", default="clean_rules", type=str, help="input folder")
     parser.add_argument("--output_path", default="ranked_rules", type=str, help="path to output file")
     parser.add_argument('--debug', action='store_true', help='debug mode')
     parser.add_argument("--transition_distr", default="exp", type=str)
-    parser.add_argument("--is_merge", default='yes', type=str_to_bool)
+    parser.add_argument("--is_merge", default='no', type=str_to_bool)
     parser.add_argument("--is_only_with_original_rules", default='no', type=str_to_bool)
     parser.add_argument("--is_iteration", default='yes', type=str_to_bool)
-    parser.add_argument("--bgkg", default="train", type=str,
+    parser.add_argument("--bgkg", default="test", type=str,
                         choices=['train', 'train_valid', 'all', 'test'])
     parser.add_argument("--is_relax_time", default='no', type=str_to_bool)
     return parser.parse_args()
