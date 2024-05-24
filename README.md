@@ -75,6 +75,10 @@ python rank_rule.py -p copy_gpt-3.5-turbo-0125-top-0-f-10-l-10 -d icews0515
 ```
 
 ```
+python reasoning.py -p copy_gpt-3.5-turbo-0125-top-0-f-10-l-10 -d icews0515 
+```
+
+```
 python evaluate.py -d icews0515  -c 'llm_test_apply_all_conf_cands_r[1,2,3]_w0_score_12[0.1,0.5,'\''TLogic'\'',0.0,0.01,0]_top_20_et_origin.json' --graph_reasoning_type TiRGN --rule_weight 0.8
 ```
 
