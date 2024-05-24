@@ -1,12 +1,11 @@
 import json
 import numpy as np
 import pandas as pd
-from collections import Counter
 
 from temporal_walk import store_edges
 
 
-def filter_rules(rules_dict, min_conf, min_body_supp, rule_lengths, confidence_type='TLogic'):
+def filter_rules(rules_dict, min_conf, min_body_supp, rule_lengths, confidence_type='Common'):
     """
     Filter for rules with a minimum confidence, minimum body support, and
     specified rule lengths.
@@ -24,7 +23,7 @@ def filter_rules(rules_dict, min_conf, min_body_supp, rule_lengths, confidence_t
     new_rules_dict = dict()
     sort_rules_dict = dict()
 
-    if confidence_type == 'TLogic':
+    if confidence_type == 'Common':
         for k in rules_dict:
             new_rules_dict[k] = []
             for rule in rules_dict[k]:
@@ -50,12 +49,6 @@ def filter_rules(rules_dict, min_conf, min_body_supp, rule_lengths, confidence_t
     for relation_id, rules in new_rules_dict.items():
         new_rules = sorted(rules, key=lambda x: x['conf'], reverse=True)
         sort_rules_dict[relation_id] = new_rules
-
-    # import random
-    #
-    # for relation_id, rules in new_rules_dict.items():
-    #     random.shuffle(rules)  # 打乱规则顺序
-    #     sort_rules_dict[relation_id] = rules
 
     return new_rules_dict, sort_rules_dict
 

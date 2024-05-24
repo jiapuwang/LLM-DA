@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def score1(rule, c=0, confidence_type='TLogic', weight=0.0):
+def score1(rule, c=0, confidence_type='Common', weight=0.0):
     """
     Calculate candidate score depending on the rule's confidence.
 
@@ -13,7 +13,7 @@ def score1(rule, c=0, confidence_type='TLogic', weight=0.0):
         score (float): candidate score
     """
 
-    if confidence_type == 'TLogic':
+    if confidence_type == 'Common':
         # score = rule["rule_supp"] / (rule["body_supp"] + c)
         score = rule['conf']
     elif confidence_type == 'LLM':

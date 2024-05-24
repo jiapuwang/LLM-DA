@@ -27,8 +27,8 @@ def parse_arguments():
     parser.add_argument("--top_k", default=20, type=int)
     parser.add_argument("--num_processes", "-p", default=1, type=int)
     parser.add_argument("--rule_files", "-f", default="", type=str)
-    parser.add_argument("--confidence_type", default="TLogic", type=str,
-                        choices=['TLogic', 'LLM', 'And', 'Or'])
+    parser.add_argument("--confidence_type", default="Common", type=str,
+                        choices=['Common', 'LLM', 'And', 'Or'])
     parser.add_argument("--weight", default=0.0, type=float)
     parser.add_argument("--weight_0", default=0.5, type=float)
     parser.add_argument("--min_conf", default=0.01, type=float)
@@ -39,9 +39,9 @@ def parse_arguments():
     parser.add_argument("--score_type", default="noisy-or", type=str,
                         choices=['noisy-or', 'sum', 'mean', 'min', 'max'])
     parser.add_argument("--is_relax_time", default='no', type=str_to_bool)
-    parser.add_argument("--is_sorted", default='no', type=str_to_bool)
+    parser.add_argument("--is_sorted", default='Yes', type=str_to_bool)
     parser.add_argument("--is_return_timestamp", default='no', type=str_to_bool)
-    parser.add_argument('--evaluation_type', type=str, choices=['transformer', 'origin', 'end'])
+    parser.add_argument('--evaluation_type', type=str, default='origin', choices=['transformer', 'origin', 'end'])
     parser.add_argument("--win_start", default=0, type=int)
     parser.add_argument("--is_sampled", default='no', type=str_to_bool)
     parser.add_argument("--is_rule_priority", default='no', type=str_to_bool)
