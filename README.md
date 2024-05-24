@@ -27,7 +27,7 @@ python Iteration_reasoning.py -d ${DATASET} --model_name gpt-3.5-turbo-0125 -f 5
 
 3. Rank Rules
 ```
-python reasoning.py -p copy_gpt-3.5-turbo-0125-top-0-f-10-l-10 -d ${DATASET} 
+python rank_rule.py -p copy_gpt-3.5-turbo-0125-top-0-f-10-l-10 -d ${DATASET} 
 ```
 
 4.  Candidate Reasoning
@@ -37,6 +37,45 @@ python reasoning.py -d ${DATASET} -r confidence.json -l 1 2 3 -p 8 --min_conf 0.
 5. Evaluate
 ```
 python evaluate.py -d ${DATASET} -c 'llm_test_apply_all_conf_cands_r[1,2,3]_w0_score_12[0.1,0.5,'\''TLogic'\'',0.0,0.01,0]_top_20_et_origin.json' --graph_reasoning_type TiRGN --rule_weight 0.9
+```
+
+## Reproduce LLM-DA results with mined rules
+###### ICEWS14
+```
+python rule_sampler.py -d icews14 -m 3 -n 200 -p 16 -s 12 --is_relax_time No
+```
+
+```
+python Iteration_reasoning.py -d icews14 --model_name gpt-3.5-turbo-0125 -f 50 -l 5 --is_rel_name Yes 
+```
+
+```
+python rank_rule.py -p copy_gpt-3.5-turbo-0125-top-0-f-10-l-10 -d icews14
+```
+
+```
+python reasoning.py -p copy_gpt-3.5-turbo-0125-top-0-f-10-l-10 -d icews14 
+```
+
+```
+python evaluate.py -d icews14  -c 'llm_test_apply_all_conf_cands_r[1,2,3]_w0_score_12[0.1,0.5,'\''TLogic'\'',0.0,0.01,0]_top_20_et_origin.json' --graph_reasoning_type TiRGN --rule_weight 0.9
+```
+
+###### ICEWS05-15
+```
+python rule_sampler.py -d icews0515 -m 3 -n 200 -p 16 -s 12 --is_relax_time No
+```
+
+```
+python Iteration_reasoning.py -d icews0515 --model_name gpt-3.5-turbo-0125 -f 50 -l 5 --is_rel_name Yes 
+```
+
+```
+python rank_rule.py -p copy_gpt-3.5-turbo-0125-top-0-f-10-l-10 -d icews0515
+```
+
+```
+python evaluate.py -d icews0515  -c 'llm_test_apply_all_conf_cands_r[1,2,3]_w0_score_12[0.1,0.5,'\''TLogic'\'',0.0,0.01,0]_top_20_et_origin.json' --graph_reasoning_type TiRGN --rule_weight 0.8
 ```
 
 ## Results
