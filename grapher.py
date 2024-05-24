@@ -1,4 +1,3 @@
-import json
 import os.path
 
 import numpy as np
