@@ -14,7 +14,7 @@ def get_params():
                                  'fusion_with_weight', 'fusion_with_source', 'fusion_with_relation', 'TADistmult',
                                  'TADistmult_with_recent', 'frequcy_only', 'new_origin_frequency', 'TiRGN', 'REGCN'],
                         default='timestamp')
-    parser.add_argument("--freq_weight", default=1.0, type=float)
+    parser.add_argument("--rule_weight", default=1.0, type=float)
     parser.add_argument("--model_weight", default=0.5, type=float)
     parser.add_argument("--interval", default=70, type=int)
     parser.add_argument("--index", default=-1, type=int)
