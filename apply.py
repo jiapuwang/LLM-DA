@@ -5,7 +5,6 @@ import argparse
 import itertools
 import numpy as np
 import torch
-import gc
 import math
 from joblib import Parallel, delayed
 import multiprocessing as mp
@@ -15,22 +14,8 @@ from grapher import Grapher
 from temporal_walk import store_edges
 from rule_learning import rules_statistics
 from score_functions import score_12, score_13, score_14
-from utils import get_win_subgraph, save_json_data, load_json_data
-
-
-# from sentence_transformers import SentenceTransformer
-# # 加载预训练的句子嵌入模型
-# model = SentenceTransformer('bert-base-nli-mean-tokens')
-
-def str_to_bool(value):
-    if isinstance(value, bool):
-        return value
-    if value.lower() in ('yes', 'true', 't', 'y', '1'):
-        return True
-    elif value.lower() in ('no', 'false', 'f', 'n', '0'):
-        return False
-    else:
-        raise argparse.ArgumentTypeError('Boolean value expected.')
+from utils import get_win_subgraph, save_json_data
+from params import str_to_bool
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--dataset", "-d", default="", type=str)
