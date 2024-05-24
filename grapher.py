@@ -1,5 +1,9 @@
 import json
+import os.path
+
 import numpy as np
+
+from utils import load_json_data
 
 
 class Grapher(object):
@@ -17,14 +21,14 @@ class Grapher(object):
 
         self.args = args
         self.dataset_dir = dataset_dir
-        self.entity2id = json.load(open(dataset_dir + "entity2id.json"))
-        self.relation2id_old = json.load(open(dataset_dir + "relation2id.json"))
+        self.entity2id = load_json_data(os.path.join(self.dataset_dir, "entity2id.json"))
+        self.relation2id_old = load_json_data(os.path.join(self.dataset_dir, "relation2id.json"))
         self.relation2id = self.relation2id_old.copy()
         counter = len(self.relation2id_old)
         for relation in self.relation2id_old:
             self.relation2id["inv_" + relation] = counter  # Inverse relation
             counter += 1
-        self.ts2id = json.load(open(dataset_dir + "ts2id.json"))
+        self.ts2id = load_json_data(os.path.join(self.dataset_dir, "ts2id.json"))
         self.id2entity = dict([(v, k) for k, v in self.entity2id.items()])
         self.id2relation = dict([(v, k) for k, v in self.relation2id.items()])
         self.id2ts = dict([(v, k) for k, v in self.ts2id.items()])
@@ -39,10 +43,9 @@ class Grapher(object):
         self.train_idx = self.create_store("train.txt")
         self.valid_idx = self.create_store("valid.txt")
         self.test_idx = self.create_store("test.txt")
-        # self.all_idx = np.vstack((self.train_idx, self.valid_idx, self.test_idx))
 
         if test_mask is not None:
-            mask = (self.test_idx[:,3] >= test_mask[0]) * (self.test_idx[:,3] <=test_mask[1])
+            mask = (self.test_idx[:, 3] >= test_mask[0]) * (self.test_idx[:, 3] <= test_mask[1])
             self.test_idx = self.test_idx[mask]
 
         if self.args is not None:
@@ -61,9 +64,7 @@ class Grapher(object):
             elif self.args['bgkg'] == 'valid_test':
                 self.all_idx = np.vstack((self.valid_idx, self.test_idx))
 
-
         print("Grapher initialized.")
-
 
     def create_store(self, file):
         """
@@ -77,7 +78,7 @@ class Grapher(object):
             store_idx (np.ndarray): indices of quadruples
         """
 
-        with open(self.dataset_dir + file, "r", encoding="utf-8") as f:
+        with open(os.path.join(self.dataset_dir, file), "r", encoding="utf-8") as f:
             quads = f.readlines()
         store = self.split_quads(quads)
         store_idx = self.map_to_idx(store)

@@ -9,7 +9,7 @@ def get_params():
     parser.add_argument("--timestamp", "-t", default="", type=str)
     parser.add_argument("--checkpoint", "-ch", default="", type=str)
     parser.add_argument("--is_known", default="No", type=str_to_bool)
-    parser.add_argument('--calc_type_with_no_cand', type=str,
+    parser.add_argument('--graph_reasoning_type', type=str,
                         choices=['transformer', 'timestamp', 'based_source_with_timestamp', 'origin', 'fusion',
                                  'fusion_with_weight', 'fusion_with_source', 'fusion_with_relation', 'TADistmult',
                                  'TADistmult_with_recent', 'frequcy_only', 'new_origin_frequency', 'TiRGN', 'REGCN'],

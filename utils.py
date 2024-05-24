@@ -314,6 +314,11 @@ def save_json_data(data, file_path):
     except Exception as e:
         print(f"Error saving JSON data to {file_path}: {e}")
 
+
+def write_to_file(content, path):
+    with open(path, "w", encoding="utf-8") as fout:
+        fout.write(content)
+
 def stat_ranks(rank_list, method='filter'):
     hits = [1, 3, 10]
     total_rank = torch.cat(rank_list)
@@ -472,49 +477,6 @@ def copy_folder_contents(source_folder, destination_folder):
             shutil.copy2(source_item, destination_item)
 
     print(f"Contents of '{source_folder}' have been copied to '{destination_folder}'")
-
-
-
-def search_candidates_for_no_cand(data, all_candidates, test_data, similiary_file_path, queryid2idx_file_path):
-    query_id_without_candidates = []
-    query_name_withoud_candidates = []
-    for key, value in all_candidates.items():
-        if len(value) == 0:
-            query_id_without_candidates.extend([key])
-
-    candidates_list = list(data.entity2id.keys())
-
-    queryid2idx = {}
-    for idx, query_id in enumerate(query_id_without_candidates):
-        query_name = test_data[query_id]
-        head_name = data.id2entity[query_name[0]]
-        rel_name = data.id2relation[query_name[1]]
-
-        query_head_rel = f'{head_name} {rel_name}'
-        query_name_withoud_candidates.append(query_head_rel)
-        queryid2idx[query_id] = idx
-
-
-    # 加载预训练的模型
-    model = SentenceTransformer('bert-base-nli-mean-tokens')
-
-    # 定义句子
-    sentences_A = query_name_withoud_candidates
-    sentences_B = candidates_list
-
-    # 使用模型为句子编码
-    embeddings_A = model.encode(sentences_A)
-    embeddings_B = model.encode(sentences_B)
-
-    # 计算句子之间的余弦相似度
-    similarity_matrix = cosine_similarity(embeddings_A, embeddings_B)
-
-    # 打印相似度矩阵
-    with open(similiary_file_path, 'wb') as f:
-        pickle.dump(similarity_matrix, f)
-
-    save_json_data(queryid2idx, queryid2idx_file_path)
-
 
 def filter_candidates(test_query, candidates, test_data):
     """

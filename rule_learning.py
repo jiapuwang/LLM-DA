@@ -8,7 +8,7 @@ import copy
 import re
 import traceback
 
-from utils import save_json_data
+from utils import save_json_data, write_to_file
 
 
 class Rule_Learner(object):
@@ -445,9 +445,7 @@ class Rule_Learner(object):
         with open(self.output_dir + filename, "w", encoding="utf-8") as fout:
             json.dump(rules_dict, fout)
 
-    def save_rules_verbalized(
-            self, dt, rule_lengths, num_walks, transition_distr, seed, rel2idx, relation_regex
-    ):
+    def save_rules_verbalized(self, dt, rule_lengths, num_walks, transition_distr, seed, rel2idx, relation_regex):
         """
         Save all rules in a human-readable format.
 
@@ -462,11 +460,30 @@ class Rule_Learner(object):
             None
         """
 
-        output_original_dir = self.output_dir + 'original/'
-        # 创建目标文件夹
-        if not os.path.exists(output_original_dir):
-            os.makedirs(output_original_dir)
+        output_original_dir = os.path.join(self.output_dir, 'original/')
+        os.makedirs(output_original_dir, exist_ok=True)
 
+        rules_str, rules_var = self.verbalize_rules()
+        save_json_data(rules_var, output_original_dir + "rules_var.json")
+
+        filename = self.generate_filename(dt, rule_lengths, num_walks, transition_distr, seed, "rules.txt")
+        write_to_file(rules_str, self.output_dir + filename)
+
+        original_rule_txt = self.output_dir + filename
+        remove_filename = self.generate_filename(dt, rule_lengths, num_walks, transition_distr, seed,
+                                                 "remove_rules.txt")
+
+        rule_id_content = self.remove_first_three_columns(self.output_dir + filename, self.output_dir + remove_filename)
+
+        self.parse_and_save_rules(remove_filename, list(rel2idx.keys()), relation_regex, 'closed_rel_paths.jsonl')
+        self.parse_and_save_rules_with_names(remove_filename, rel2idx, relation_regex, 'rules_name.json',
+                                             rule_id_content)
+        self.parse_and_save_rules_with_ids(rule_id_content, rel2idx, relation_regex, 'rules_id.json')
+
+        self.save_rule_name_with_confidence(original_rule_txt, relation_regex,
+                                       self.output_dir + 'relation_name_with_confidence.json', list(rel2idx.keys()))
+
+    def verbalize_rules(self):
         rules_str = ""
         rules_var = {}
         for rel in self.rules_dict:
@@ -476,71 +493,79 @@ class Rule_Learner(object):
                 rule_with_confidence = f"{part[-1]}"
                 rules_var[rule_with_confidence] = rule
                 rules_str += single_rule
+        return rules_str, rules_var
 
-        save_json_data(rules_var, output_original_dir + "rules_var.json")
+    def generate_filename(self, dt, rule_lengths, num_walks, transition_distr, seed, suffix):
+        filename = f"{dt}_r{rule_lengths}_n{num_walks}_{transition_distr}_s{seed}_{suffix}"
+        return filename.replace(" ", "")
 
-        filename = "{0}_r{1}_n{2}_{3}_s{4}_rules.txt".format(
-            dt, rule_lengths, num_walks, transition_distr, seed
-        )
-        filename = filename.replace(" ", "")
-        with open(self.output_dir + filename, "w", encoding="utf-8") as fout:
-            fout.write(rules_str)
-
-        original_rule_txt = self.output_dir + filename
-
-        remove_filename = "remove_{0}_r{1}_n{2}_{3}_s{4}_rules.txt".format(
-            dt, rule_lengths, num_walks, transition_distr, seed
-        )
-        remove_filename = remove_filename.replace(" ", "")
-
+    def remove_first_three_columns(self, input_path, output_path):
         rule_id_content = []
-
-        with open(self.output_dir + filename, 'r') as input_file, open(self.output_dir + remove_filename, 'w',
-                                                                       encoding="utf-8") as output_file:
+        with open(input_path, 'r') as input_file, open(output_path, 'w', encoding="utf-8") as output_file:
             for line in input_file:
-                # 分割每一行并移除前三列
                 columns = line.split()
                 new_line = ' '.join(columns[3:])
                 new_line_for_rule_id = ' '.join(columns[3:]) + '&' + columns[0] + '\n'
                 rule_id_content.append(new_line_for_rule_id)
-                # 将修改后的行写入新文件
                 output_file.write(new_line + '\n')
+        return rule_id_content
 
-        output_file_path = self.output_dir + 'closed_rel_paths.jsonl'
+    def parse_and_save_rules(self, remove_filename, keys, relation_regex, output_filename):
+        output_file_path = os.path.join(self.output_dir, output_filename)
         with open(self.output_dir + remove_filename, 'r') as file:
             lines = file.readlines()
-            converted_rules = parse_rules_for_path(lines, list(rel2idx.keys()), relation_regex)
+            converted_rules = parse_rules_for_path(lines, keys, relation_regex)
         with open(output_file_path, 'w') as file:
             for head, paths in converted_rules.items():
                 json.dump({"head": head, "paths": paths}, file)
                 file.write('\n')
-
         print(f'Rules have been converted and saved to {output_file_path}')
+        return converted_rules
 
-        # Read the rules from a file
-        input_file_path = self.output_dir + remove_filename
+    def parse_and_save_rules_with_names(self, remove_filename, rel2idx, relation_regex, output_filename,
+                                        rule_id_content):
+        input_file_path = os.path.join(self.output_dir, remove_filename)
+        output_file_path = os.path.join(self.output_dir, output_filename)
         with open(input_file_path, 'r') as file:
             rules_content = file.readlines()
             rules_name_dict = parse_rules_for_name(rules_content, list(rel2idx.keys()), relation_regex)
-
-        # Write the JSON to a file
-        output_file_path = self.output_dir + 'rules_name.json'
         with open(output_file_path, 'w') as file:
             json.dump(rules_name_dict, file, indent=4)
-
         print(f'Rules have been converted and saved to {output_file_path}')
 
+    def parse_and_save_rules_with_ids(self, rule_id_content, rel2idx, relation_regex, output_filename):
+        output_file_path = os.path.join(self.output_dir, output_filename)
         rules_id_dict = parse_rules_for_id(rule_id_content, rel2idx, relation_regex)
-
-        # Write the JSON to a file
-        output_file_path = self.output_dir + 'rules_id.json'
         with open(output_file_path, 'w') as file:
             json.dump(rules_id_dict, file, indent=4)
-
         print(f'Rules have been converted and saved to {output_file_path}')
 
-        save_rule_name_with_confidence(original_rule_txt, relation_regex,
-                                       self.output_dir + 'relation_name_with_confidence.json', list(rel2idx.keys()))
+    def save_rule_name_with_confidence(self, file_path, relation_regex, out_file_path, relations):
+        rules_dict = {}
+        with open(file_path, 'r') as fin:
+            rules = fin.readlines()
+            for rule in rules:
+                # Split the string by spaces to get the columns
+                columns = rule.split()
+
+                # Extract the first and fourth columns
+                first_column = columns[0]
+                fourth_column = ''.join(columns[3:])
+                output = f"{fourth_column}&{first_column}"
+
+                regrex_list = fourth_column.split('<-')
+                match = re.search(relation_regex, regrex_list[0])
+                if match:
+                    head = match[1].strip()
+                    if head not in relations:
+                        raise ValueError(f"Not exist relation:{head}")
+                else:
+                    continue
+
+                if head not in rules_dict:
+                    rules_dict[head] = []
+                rules_dict[head].append(output)
+        save_json_data(rules_dict, out_file_path)
 
 
 def parse_rules_for_path(lines, relations, relation_regex):
@@ -590,36 +615,6 @@ def parse_rules_for_name(lines, relations, relation_regex):
         rules_dict[head].append(rule)
 
     return rules_dict
-
-
-def save_rule_name_with_confidence(file_path, relation_regex, out_file_path, relations):
-    rules_dict = {}
-    with open(file_path, 'r') as fin:
-        rules = fin.readlines()
-        for rule in rules:
-            # Split the string by spaces to get the columns
-            columns = rule.split()
-
-            # Extract the first and fourth columns
-            first_column = columns[0]
-            fourth_column = ''.join(columns[3:])
-            output = f"{fourth_column}&{first_column}"
-
-            # print(fourth_column)
-
-            regrex_list = fourth_column.split('<-')
-            match = re.search(relation_regex, regrex_list[0])
-            if match:
-                head = match[1].strip()
-                if head not in relations:
-                    raise ValueError(f"Not exist relation:{head}")
-            else:
-                continue
-
-            if head not in rules_dict:
-                rules_dict[head] = []
-            rules_dict[head].append(output)
-    save_json_data(rules_dict, out_file_path)
 
 
 def parse_rules_for_id(rules, rel2idx, relation_regex):
