@@ -399,7 +399,7 @@ def get_subgraph(relation_subgraph, head_id, fixed_character, rules, model):
             return list_str
 
 
-def generate_rule(row, rdict, rule_path, kg_rules_path, model, args, relation_subgraph, relation_regex,
+def generate_rule(row, rdict, rule_path, kg_rules_path, model, args, relation_regex,
                   similiary_rel_dict):
     relation2id = rdict.rel2idx
     head = row["head"]
@@ -566,7 +566,7 @@ def extract_and_expand_relations(args, path_content_list, similiary_rel_dict, re
     return condicate
 
 
-def generate_rule_for_iteration_by_multi_thread(row, rdict, rule_path, kg_rules_path, model, args, relation_subgraph,
+def generate_rule_for_iteration_by_multi_thread(row, rdict, rule_path, kg_rules_path, model, args,
                                                 relation_regex,
                                                 similiary_rel_dict, kg_rules_path_with_valid):
     relation2id = rdict.rel2idx
@@ -902,69 +902,80 @@ def analysis_data(confidence_folder, kg_rules_path):
         fout_state.write(f'valid_low:{len(low_rule_set-all_rules_set)}\n')
 
 
-def main(args, LLM):
+def load_data_and_paths(args):
     data_path = os.path.join(args.data_path, args.dataset) + "/"
     dataset = Dataset(data_root=data_path, inv=True)
 
-    sampled_path_with_valid_dir = os.path.join(args.sampled_paths, args.dataset+'_valid')
-
+    sampled_path_with_valid_dir = os.path.join(args.sampled_paths, args.dataset + '_valid')
     sampled_path_dir = os.path.join(args.sampled_paths, args.dataset)
     sampled_path = read_paths(os.path.join(sampled_path_dir, "closed_rel_paths.jsonl"))
 
-    rule_head_without_zero = set()
+    return dataset, sampled_path, sampled_path_with_valid_dir, sampled_path_dir
 
-    for idx, rule in enumerate(sampled_path):
-        rule_head_without_zero.add(rule['head'])
 
-    rule_head_with_zero = set(list(dataset.rdict.rel2idx.keys())) - rule_head_without_zero
+def prepare_rule_heads(dataset, sampled_path):
+    rule_head_without_zero = {rule['head'] for rule in sampled_path}
+    rule_head_with_zero = set(dataset.rdict.rel2idx.keys()) - rule_head_without_zero
+    return rule_head_without_zero, rule_head_with_zero
 
-    if args.is_rel_name is True:
-        kg_rules_path = os.path.join(sampled_path_dir, "rules_name.json")
+
+def determine_kg_rules_path(args, sampled_path_dir):
+    if args.is_rel_name:
+        return os.path.join(sampled_path_dir, "rules_name.json")
     else:
-        kg_rules_path = os.path.join(sampled_path_dir, "rules_id.json")
+        return os.path.join(sampled_path_dir, "rules_id.json")
 
+
+def load_configuration(dataset, sampled_path_dir, args):
     constant_config = load_json_data('./Config/constant.json')
     relation_regex = constant_config['relation_regex'][args.dataset]
 
-    relation_subgraph_path = os.path.join(sampled_path_dir, "relation_subgraph.json")
-    relation_subgraph = load_json_data(relation_subgraph_path)
-
     rdict = dataset.get_relation_dict()
-
-    similary_matrix = np.load(os.path.join(sampled_path_dir, "matrix.npy"))
+    similarity_matrix = np.load(os.path.join(sampled_path_dir, "matrix.npy"))
     transformers_id2rel = load_json_data(os.path.join(sampled_path_dir, "transfomers_id2rel.json"))
     transformers_rel2id = load_json_data(os.path.join(sampled_path_dir, "transfomers_rel2id.json"))
 
-    similiary_rel_dict = get_topk_similiary_rel(args.topk, similary_matrix, transformers_id2rel, transformers_rel2id)
+    similar_rel_dict = get_topk_similiary_rel(args.topk, similarity_matrix, transformers_id2rel, transformers_rel2id)
 
-    # Save paths
+    return rdict, relation_regex, similar_rel_dict
+
+
+def create_directories(args):
     rule_path = os.path.join(
-        args.rule_path,
-        args.dataset,
-        f"{args.prefix}{args.model_name}-top-{args.k}-f-{args.f}-l-{args.l}",
+        args.rule_path, args.dataset,
+        f"{args.prefix}{args.model_name}-top-{args.k}-f-{args.f}-l-{args.l}"
     )
-    if not os.path.exists(rule_path):
-        os.makedirs(rule_path)
+    os.makedirs(rule_path, exist_ok=True)
 
     filter_rule_path = os.path.join(
-        args.rule_path,
-        args.dataset,
-        f"copy_{args.prefix}{args.model_name}-top-{args.k}-f-{args.f}-l-{args.l}",
+        args.rule_path, args.dataset,
+        f"copy_{args.prefix}{args.model_name}-top-{args.k}-f-{args.f}-l-{args.l}"
     )
     if not os.path.exists(filter_rule_path):
         os.makedirs(filter_rule_path)
     else:
         clear_folder(filter_rule_path)
 
+    return rule_path, filter_rule_path
+
+
+def main(args, LLM):
+    dataset, sampled_path, sampled_path_with_valid_dir, sampled_path_dir = load_data_and_paths(args)
+    rule_head_without_zero, rule_head_with_zero = prepare_rule_heads(dataset, sampled_path)
+    kg_rules_path = determine_kg_rules_path(args, sampled_path_dir)
+    rdict, relation_regex, similar_rel_dict = load_configuration(dataset, sampled_path_dir, args)
+    rule_path, filter_rule_path = create_directories(args)
+
     model = LLM(args)
-    print("Prepare pipline for inference...")
+    print("Preparing pipeline for inference...")
     model.prepare_for_inference()
 
-    llm_rule_generate(args, filter_rule_path, kg_rules_path, model, rdict, relation_regex, relation_subgraph, rule_path,
-                      sampled_path, similiary_rel_dict, sampled_path_with_valid_dir, rule_head_with_zero)
+    llm_rule_generate(
+        args, filter_rule_path, kg_rules_path, model, rdict, relation_regex, rule_path,
+        sampled_path, similar_rel_dict, sampled_path_with_valid_dir, rule_head_with_zero
+    )
 
-
-def llm_rule_generate(args, filter_rule_path, kg_rules_path, model, rdict, relation_regex, relation_subgraph, rule_path,
+def llm_rule_generate(args, filter_rule_path, kg_rules_path, model, rdict, relation_regex, rule_path,
                       sampled_path, similiary_rel_dict, sampled_path_with_valid_dir, rule_head_with_zero):
     # Generate rules
     with ThreadPool(args.n) as p:
@@ -977,7 +988,6 @@ def llm_rule_generate(args, filter_rule_path, kg_rules_path, model, rdict, relat
                         kg_rules_path=kg_rules_path,
                         model=model,
                         args=args,
-                        relation_subgraph=relation_subgraph,
                         relation_regex=relation_regex,
                         similiary_rel_dict=similiary_rel_dict
                     ),
@@ -1012,8 +1022,6 @@ def llm_rule_generate(args, filter_rule_path, kg_rules_path, model, rdict, relat
                 fout.write(response + "\n")
             else:
                 print(f"Error:{filename}")
-
-
 
     #valid dataset中的rule
     kg_rules_path_with_valid = os.path.join(sampled_path_with_valid_dir, "rules_name.json")
@@ -1142,7 +1150,7 @@ def llm_rule_generate(args, filter_rule_path, kg_rules_path, model, rdict, relat
 
         clear_folder(iteration_only_txt_file_path)
         clear_folder(iteration_rule_file_path)
-        gen_rules_iteration(args, kg_rules_path, model, rdict, relation_regex, relation_subgraph,
+        gen_rules_iteration(args, kg_rules_path, model, rdict, relation_regex,
                             iteration_rule_file_path,
                             conf, similiary_rel_dict, kg_rules_path_with_valid)
         copy_files(iteration_rule_file_path, iteration_only_txt_file_path, 'txt')
@@ -1197,7 +1205,7 @@ def llm_rule_generate(args, filter_rule_path, kg_rules_path, model, rdict, relat
         for rule in unique_strings:
             fout_final.write(f'{rule}\n')
 
-def gen_rules_iteration(args, kg_rules_path, model, rdict, relation_regex, relation_subgraph, rule_path, conf,
+def gen_rules_iteration(args, kg_rules_path, model, rdict, relation_regex, rule_path, conf,
                         similiary_rel_dict, kg_rules_path_with_valid):
     with ThreadPool(args.n) as p:
         for _ in tqdm(
@@ -1209,7 +1217,6 @@ def gen_rules_iteration(args, kg_rules_path, model, rdict, relation_regex, relat
                         kg_rules_path=kg_rules_path,
                         model=model,
                         args=args,
-                        relation_subgraph=relation_subgraph,
                         relation_regex=relation_regex,
                         similiary_rel_dict=similiary_rel_dict,
                         kg_rules_path_with_valid = kg_rules_path_with_valid
