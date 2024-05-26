@@ -1,12 +1,8 @@
-import argparse
-import os
-
 from chat_rule_generator import clear_folder
 from data import *
 from llms import get_registed_model
 from utils import *
 import re
-from difflib import get_close_matches
 
 
 def extract_rules(content_list, rule_start_with_regex, replace_regex):

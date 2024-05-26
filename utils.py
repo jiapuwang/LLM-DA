@@ -559,53 +559,6 @@ def get_top_k_with_index(similarity_file_path, top_k):
 
     return result_dict
 
-def dataset_analysis(data, all_candidates):
-    query_id_without_candidates = []
-    for key, value in all_candidates.items():
-        if len(value) == 0:
-            query_id_without_candidates.extend([key])
-
-    test_ = data.test_idx
-    train_ = data.train_idx
-    valid_ = data.valid_idx
-
-    test_n = np.array(test_)
-    test_n = test_n[query_id_without_candidates]
-
-    train_n = np.array(train_)
-    valid_n = np.array(valid_)
-
-    analysis_bkg = np.vstack((valid_n, train_n))
-
-    temp_dict = {}
-    num_miss = 0
-    for head_id, rel_id, answer_id, timestamp_id in test_n:
-        temp_key = f'{head_id}_{rel_id}_{answer_id}_{timestamp_id}'
-        mask = analysis_bkg[:, 2] == answer_id
-        answer_timestamp = analysis_bkg[mask][:, 3]
-
-        try:
-          temp_dict[temp_key] = int(timestamp_id - max(answer_timestamp))
-        except Exception as e:
-            num_miss = num_miss + 1
-
-    print(num_miss)
-
-    interval_list = list(temp_dict.values())
-
-    save_json_data(interval_list, '/mnt/sda/sk/project/LLM_Temporal/eva/icews14/interval_list.json')
-
-def str_to_bool(value):
-    if isinstance(value, bool):
-        return value
-    if value.lower() in ('yes', 'true', 't', 'y', '1'):
-        return True
-    elif value.lower() in ('no', 'false', 'f', 'n', '0'):
-        return False
-    else:
-        raise argparse.ArgumentTypeError('Boolean value expected.')
-
-
 def get_candicates_by_timestamp(test_query, bkg, interval):
     timestamp_id = test_query[3]
 
