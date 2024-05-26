@@ -95,9 +95,5 @@ If you found this repo helpful, please help us by citing this paper:
   journal={arXiv preprint arXiv:2405.14170},
   year={2024}
 }
-      eprint={2405.14170},
-      archivePrefix={arXiv},
-      primaryClass={cs.AI}
-}
 ```
 
