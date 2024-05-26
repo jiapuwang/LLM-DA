@@ -354,51 +354,6 @@ def get_rule_format(head, path, kg_rules_path):
         return kg_rules_dict[head]
 
 
-def get_subgraph(relation_subgraph, head_id, fixed_character, rules, model):
-    subgraphes = relation_subgraph[str(head_id)]
-
-    max_promt = 1000000
-    min_idx = 0
-    for idx, subgraph in enumerate(subgraphes):
-        # subgraph = len(list(subgraph.values())[0])
-        temp_list = list(subgraph.values())
-        unique_list = [list(t) for t in set(tuple(sublist) for sublist in temp_list[0])]
-        sorted_list = sorted(unique_list, key=lambda x: x[3])
-        list_str = str(sorted_list)
-        before_all_tokens = fixed_character + "\n".join(rules)
-        before_length = model.token_len(before_all_tokens)
-        after_all_tokens = fixed_character + list_str + "\n".join(rules)
-        # maximun_token = model.maximum_token
-        maximun_token = before_length + 2000
-        tokens_length = model.token_len(after_all_tokens)
-        if tokens_length < maximun_token:
-            return list_str
-        else:
-            if tokens_length < max_promt:
-                max_promt = tokens_length
-                min_idx = idx
-
-    min_length_subgraph = subgraphes[min_idx]
-    my_list = list(min_length_subgraph.values())[0]
-
-    my_list_array = np.array(my_list)
-    timestamps = my_list_array[:, 3]
-    unique_array = np.unique(timestamps)
-    for idx, time in enumerate(unique_array):
-        prume_subgraph = my_list_array[timestamps > time].tolist()
-        unique_list = [list(t) for t in set(tuple(sublist) for sublist in prume_subgraph)]
-        sorted_list = sorted(unique_list, key=lambda x: x[3])
-        list_str = str(sorted_list)
-        before_all_tokens = fixed_character + "\n".join(rules)
-        before_length = model.token_len(before_all_tokens)
-        after_all_tokens = fixed_character + list_str + "\n".join(rules)
-        # maximun_token = model.maximum_token
-        maximun_token = before_length + 2000
-        tokens_length = model.token_len(after_all_tokens)
-        if tokens_length < maximun_token:
-            return list_str
-
-
 def generate_rule(row, rdict, rule_path, kg_rules_path, model, args, relation_regex,
                   similiary_rel_dict):
     relation2id = rdict.rel2idx
@@ -688,20 +643,6 @@ def generate_rule_for_unknown_relation_by_multi_thread(row, rdict, rule_path, kg
 
             return_rules = return_rules.format(candidate_rels=formatted_string)
 
-            # few_shot_subgraph = get_subgraph(relation_subgraph, head_id, temp_current_prompt, few_shot_samples,
-            #                                  model)
-
-            # few_shot_paths = check_prompt_length(
-            #     temp_current_prompt,
-            #     few_shot_samples, model
-            # )
-
-            # if not few_shot_paths:
-            #     raise ValueError("few_shot_paths is empty, head:{}".format(head))
-            #
-            # few_shot_paths = few_shot_paths + "\n\n"
-            #
-            # return_rules = "\n\n" + return_rules
 
             prompt = fixed_context + predict + return_rules
             # tqdm.write("Prompt: \n{}".format(prompt))
