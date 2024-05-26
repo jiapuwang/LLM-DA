@@ -7,22 +7,11 @@ import json
 import scipy.sparse as ssp
 import shutil
 import pickle
-import argparse
 import math
 from collections import Counter
 import pandas as pd
 
-# from sentence_transformers import SentenceTransformer
-# from sklearn.metrics.pairwise import cosine_similarity
 import rule_application as ra
-from baseline import baseline_candidates
-
-
-# load_dotenv()
-# openai.api_key = os.getenv("OPENAI_API_KEY")
-# openai.organization = os.getenv("OPENAI_ORG")
-# os.environ['TIKTOKEN_CACHE_DIR'] = './tmp'
-
 
 def print_msg(msg):
     msg = "## {} ##".format(msg)
@@ -1079,35 +1068,6 @@ def get_candicates_within_interval(timestamp_id, interval, bkg, return_recent=Fa
         # 使用groupby根据第一列进行分组，并找到每个分组中第二列的最大值
         result = df.loc[df.groupby('neighbor')['timestamp'].idxmax()].reset_index(drop=True)
         result_dict = result.set_index('neighbor')['timestamp'].to_dict()
-
-def process_candidates_based_frequency(candidates:dict, test_query, interval,  bkg, learn_edges, obj_dist,
-                                                            rel_obj_dist, freq_weight):
-    # 判断是否存在候选项
-    is_exist = bool(candidates)  # 使用bool直接转换，更简洁
-
-    # 获取最大时间戳对应的候选项
-    cand_with_max_timestamp = get_candicates_by_timestamp(test_query, bkg, interval)
-
-    # 如果没有候选项直接返回
-    if not candidates:
-        candidates = baseline_candidates(test_query[1], learn_edges, obj_dist, rel_obj_dist)
-
-    normalize_candidates = normalize_scores(candidates)
-
-    # 计算共有键
-    common_keys = set(normalize_candidates.keys()) & set(cand_with_max_timestamp.keys())
-
-    # 如果没有共有键，直接返回原始候选项
-    if not common_keys:
-        return normalize_candidates, is_exist
-
-    # 如果存在共有键，更新candidates中的分数
-    for key in common_keys:
-        score_A = normalize_candidates[key]  # 直接访问，因为key一定存在
-        score_B = cand_with_max_timestamp.get(key, 0)
-        normalize_candidates[key] = score_A + freq_weight * score_B
-
-    return normalize_candidates, is_exist
 
 def get_candicates_auto(timestamp_id, interval, bkg, return_recent=False):
     min_timestamp_id = timestamp_id - interval
