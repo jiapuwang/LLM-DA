@@ -795,22 +795,6 @@ def process_rules_files(input_dir, output_dir, rdict, relation_regex, error_file
         f_error_out.write(f"The number of error during id maps name is:{sum}")
 
 
-def clear_folder(folder_path):
-    # 确保文件夹存在
-    if not os.path.exists(folder_path):
-        return
-
-    # 遍历文件夹中的所有文件和文件夹
-    for filename in os.listdir(folder_path):
-        file_path = os.path.join(folder_path, filename)
-        # 如果是文件，则直接删除
-        if os.path.isfile(file_path):
-            os.remove(file_path)
-        # 如果是文件夹，则递归清空文件夹
-        elif os.path.isdir(file_path):
-            shutil.rmtree(file_path)
-
-
 def get_topk_similiary_rel(topk, similary_matrix, transformers_id2rel, transformers_rel2id):
     # 计算每一行中数值最大的前 topk 个元素的索引
     topk = -topk
