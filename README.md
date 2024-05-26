@@ -89,10 +89,12 @@ python evaluate.py -d icews0515  -c 'llm_test_apply_all_conf_cands_r[1,2,3]_w0_s
 ## Bibinfo
 If you found this repo helpful, please help us by citing this paper:
 ```
-@misc{wang2024large,
-      title={Large Language Models-guided Dynamic Adaptation for Temporal Knowledge Graph Reasoning}, 
-      author={Jiapu Wang and Kai Sun and Linhao Luo and Wei Wei and Yongli Hu and Alan Wee-Chung Liew and Shirui Pan and Baocai Yin},
-      year={2024},
+@article{wang2024large,
+  title={Large Language Models-guided Dynamic Adaptation for Temporal Knowledge Graph Reasoning},
+  author={Wang, Jiapu and Sun, Kai and Luo, Linhao and Wei, Wei and Hu, Yongli and Liew, Alan Wee-Chung and Pan, Shirui and Yin, Baocai},
+  journal={arXiv preprint arXiv:2405.14170},
+  year={2024}
+}
       eprint={2405.14170},
       archivePrefix={arXiv},
       primaryClass={cs.AI}
