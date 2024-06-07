@@ -1,0 +1,7 @@
+{
+    "zero": {
+        "context": "You are an expert in temporal knowledge graph reasoning. Please generate as many temporal logic rules as possible related to \"{head}(X0,Xl,Tl)\".\n\nHere are a few examples: \n\nRule head: inv_Provide_humanitarian_aid(X0,Xl,Tl)\ninv_Provide_humanitarian_aid(X0,X1,T1)<-inv_Engage_in_diplomatic_cooperation(X0,X1,T0)\ninv_Provide_humanitarian_aid(X0,X3,T3)<-inv_Criticize_or_denounce(X0,X1,T0)&inv_Demand(X1,X2,T1)&Make_a_visit(X2,X3,T2)\ninv_Provide_humanitarian_aid(X0,X2,T2)<-Make_a_visit(X0,X1,T0)&Make_a_visit(X1,X2,T1)\nRule head: Appeal_for_change_in_institutions,_regime(X0,Xl,Tl)\nAppeal_for_change_in_institutions,_regime(X0,X1,T1)<-inv_Engage_in_symbolic_act(X0,X1,T0)\nAppeal_for_change_in_institutions,_regime(X0,X2,T2)<-inv_Criticize_or_denounce(X0,X1,T0)&Make_pessimistic_comment(X1,X2,T1)\nRule head: Appeal_for_economic_aid(X0,Xl,Tl)\nAppeal_for_economic_aid(X0,X1,T1)<-inv_Reduce_or_stop_military_assistance(X0,X1,T0)\nAppeal_for_economic_aid(X0,X2,T2)<-inv_Make_an_appeal_or_request(X0,X1,T0)&Make_statement(X1,X2,T1)\nAppeal_for_economic_aid(X0,X3,T3)<-inv_Demand(X0,X1,T0)&inv_Accede_to_demands_for_change_in_leadership(X1,X2,T1)&Accuse(X2,X3,T2)",
+        "predict": "Let's think step-by-step, please generate as many as possible most relevant temporal rules that are relative to \"{head}(X0,Xl,Tl)\".",
+        "return": "For the relations in rule body, you are going to choose from the following candidates: {candidate_rels}.\n\n Return the rules only without any explanations."
+    }
+}
