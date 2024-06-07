@@ -1,3 +1,4 @@
+import argparse
 import glob
 import os.path
 import traceback
@@ -17,261 +18,6 @@ from rule_learning import Rule_Learner, rules_statistics
 from concurrent.futures import ThreadPoolExecutor
 from params import str_to_bool
 
-prompt_dict = {}
-
-"............................................................................................................"
-
-prompt_dict['first'] = {}
-prompt_dict['first']['defination'] = {}
-
-prompt_dict['first']['context'] = (
-    'You are an expert in temporal knowledge graph reasoning. Please generate as many temporal logic rules as possible related to "{head}(X0,Xl,Tl)" based on sampled rules.\n\n'
-    'Here are a few examples: \n\n'
-    'Rule head: inv_Provide_humanitarian_aid(X0,Xl,Tl)\n'
-    'Sampled rules:\n'
-    '\tinv_Provide_humanitarian_aid(X0,X1,T1)<-inv_Engage_in_diplomatic_cooperation(X0,X1,T0)\n'
-    '\tinv_Provide_humanitarian_aid(X0,X3,T3)<-inv_Criticize_or_denounce(X0,X1,T0)&inv_Demand(X1,X2,T1)&Make_a_visit(X2,X3,T2)\n'
-    '\tinv_Provide_humanitarian_aid(X0,X2,T2)<-Make_a_visit(X0,X1,T0)&Make_a_visit(X1,X2,T1)\n'
-
-    'Generated Temporal logic rules:\n'
-    '\tinv_Provide_humanitarian_aid(X0,X1,T1)<-inv_Provide_aid(X0,X1,T0)\n'
-    '\tinv_Provide_humanitarian_aid(X0,X2,T2)<-Make_an_appeal_or_request(X0,X1,T0)&inv_Consult(X1,X2,T1)\n'
-    '\tinv_Provide_humanitarian_aid(X0,X3,T3)<-inv_Return,_release_person(s)(X0,X1,T0)&Return,_release_person(s)(X1,X2,T1)&Accuse(X2,X3,T2)\n\n'
-
-    'Rule head: Appeal_for_change_in_institutions,_regime(X0,Xl,Tl)\n'
-    'Sampled rules:\n'
-    '\tAppeal_for_change_in_institutions,_regime(X0,X1,T1)<-inv_Engage_in_symbolic_act(X0,X1,T0)\n'
-    '\tAppeal_for_change_in_institutions,_regime(X0,X2,T2)<-inv_Criticize_or_denounce(X0,X1,T0)&Make_pessimistic_comment(X1,X2,T1)\n'
-
-    'Generated Temporal logic rules:\n'
-    '\tAppeal_for_change_in_institutions,_regime(X0,X1,T1)<-Make_an_appeal_or_request(X0,X1,T0)\n'
-    '\tAppeal_for_change_in_institutions,_regime(X0,X2,T2)<-inv_Rally_support_on_behalf_of(X0,X1,T0)&Praise_or_endorse(X1,X2,T1)\n'
-    '\tAppeal_for_change_in_institutions,_regime(X0,X3,T3)<-Appeal_for_change_in_institutions,_regime(X0,X1,T0)&Host_a_visit(X1,X2,T1)&inv_Criticize_or_denounce(X2,X3,T2)\n'
-    '\tAppeal_for_change_in_institutions,_regime(X0,X2,T2)<-inv_Engage_in_symbolic_act(X0,X1,T0)&inv_Consult(X1,X2,T1)\n\n'
-
-
-    'Rule head: Appeal_for_economic_aid(X0,Xl,Tl)\n'
-    'Sampled rules:\n'
-    '\tAppeal_for_economic_aid(X0,X1,T1)<-inv_Reduce_or_stop_military_assistance(X0,X1,T0)\n'
-    '\tAppeal_for_economic_aid(X0,X2,T2)<-inv_Make_an_appeal_or_request(X0,X1,T0)&Make_statement(X1,X2,T1)\n'
-    '\tAppeal_for_economic_aid(X0,X3,T3)<-inv_Demand(X0,X1,T0)&inv_Accede_to_demands_for_change_in_leadership(X1,X2,T1)&Accuse(X2,X3,T2)\n'
-
-    'Generated Temporal logic rules:\n'
-    '\tAppeal_for_economic_aid(X0,X2,T2)<-Make_an_appeal_or_request(X0,X1,T0)&Appeal_for_military_aid(X1,X2,T1)\n'
-    '\tAppeal_for_economic_aid(X0,X2,T2)<-inv_Express_intent_to_cooperate(X0,X1,T0)&Make_statement(X1,X2,T1)\n'
-    '\tAppeal_for_economic_aid(X0,X1,T1)<-Make_an_appeal_or_request(X0,X1,T0)\n\n')
-
-prompt_dict['first']['chain'] = "Sampled rules:\n"
-
-prompt_dict['first']['predict'] = (
-    '\n\nLet\'s think step-by-step, please generate as many as possible most relevant temporal rules that are relative to "{head}(X0,Xl,Tl)" based on the above sampled rules.\n\n')
-
-prompt_dict['first']['return'] = 'For the relations in rule body, you are going to choose from the following candidates: {candidate_rels}.\n\n Return the rules only without any explanations.'
-
-"............................................................................................................"
-
-prompt_dict['zero'] = {}
-prompt_dict['zero']['context'] = (
-    'You are an expert in temporal knowledge graph reasoning. Please generate as many temporal logic rules as possible related to "{head}(X0,Xl,Tl)".\n\n'
-    'Here are a few examples: \n\n'
-    'Rule head: inv_Provide_humanitarian_aid(X0,Xl,Tl)\n'
-    'inv_Provide_humanitarian_aid(X0,X1,T1)<-inv_Engage_in_diplomatic_cooperation(X0,X1,T0)\n'
-    'inv_Provide_humanitarian_aid(X0,X3,T3)<-inv_Criticize_or_denounce(X0,X1,T0)&inv_Demand(X1,X2,T1)&Make_a_visit(X2,X3,T2)\n'
-    'inv_Provide_humanitarian_aid(X0,X2,T2)<-Make_a_visit(X0,X1,T0)&Make_a_visit(X1,X2,T1)\n'
-
-    'Rule head: Appeal_for_change_in_institutions,_regime(X0,Xl,Tl)\n'
-    'Appeal_for_change_in_institutions,_regime(X0,X1,T1)<-inv_Engage_in_symbolic_act(X0,X1,T0)\n'
-    'Appeal_for_change_in_institutions,_regime(X0,X2,T2)<-inv_Criticize_or_denounce(X0,X1,T0)&Make_pessimistic_comment(X1,X2,T1)\n'
-
-    'Rule head: Appeal_for_economic_aid(X0,Xl,Tl)\n'
-    'Appeal_for_economic_aid(X0,X1,T1)<-inv_Reduce_or_stop_military_assistance(X0,X1,T0)\n'
-    'Appeal_for_economic_aid(X0,X2,T2)<-inv_Make_an_appeal_or_request(X0,X1,T0)&Make_statement(X1,X2,T1)\n'
-    'Appeal_for_economic_aid(X0,X3,T3)<-inv_Demand(X0,X1,T0)&inv_Accede_to_demands_for_change_in_leadership(X1,X2,T1)&Accuse(X2,X3,T2)\n')
-
-prompt_dict['zero']['predict'] = (
-    '\n\nLet\'s think step-by-step, please generate as many as possible most relevant temporal rules that are relative to "{head}(X0,Xl,Tl)".\n\n')
-
-prompt_dict['zero']['return'] = 'For the relations in rule body, you are going to choose from the following candidates: {candidate_rels}.\n\n Return the rules only without any explanations.'
-
-"............................................................................................................"
-
-prompt_dict['iteration'] = {}
-
-prompt_dict['iteration']['context'] = ('You are an expert in temporal knowledge graph reasoning. Your task is to analyze the sampled temporal logic rules and refine the low-quality logic rules generated by LLMs into high-quality ones. Please ensure that these refined rules more closely match the distribution of the sampled temporal logic rules.\n\n'
-
-'Here are a few examples:\n'
-'Rule head: Make_a_visit(X0,Xl,Tl)\n'
-'Low Quality Temporal Logic Rules:\n'
-'\tMake_a_visit(X0,X1,T1)<-Provide_military_protection_or_peacekeeping(X0,X1,T0)\n'
-'\tMake_a_visit(X0,X1,T3)<-Appeal_for_diplomatic_cooperation_(such_as_policy_support)(X0,X1,T0)&inv_Consult(X1,X2,T1)&inv_Make_statement(X2,X1,T2)\n'
-'\tMake_a_visit(X0,X3,T3)<-inv_Host_a_visit(X0,X1,T0)&inv_Mobilize_or_increase_armed_forces(X1,X2,T1)&Express_intent_to_de-escalate_military_engagement(X2,X3,T2)\n'
-
-'Generated High Quality Temporal Logical Rules:\n'                                  
-'\tMake_a_visit(X0,X1,T1)<-Make_a_visit(X0,X1,T0)\n'
-'\tMake_a_visit(X0,X2,T2)<-Express_intent_to_meet_or_negotiate(X0,X1,T0)&Make_a_visit(X1,X2,T1)\n'
-'\tMake_a_visit(X0,X3,T3)<-Consult(X0,X1,T0)&Engage_in_negotiation(X1,X2,T1)&Make_a_visit(X2,X3,T2)\n\n'
-
-'Rule head: inv_Provide_humanitarian_aid(X0,Xl,Tl)\n'
-'Low Quality Temporal Logic Rules:\n'
-'\tinv_Provide_humanitarian_aid(X0,X1,T3)<-inv_Investigate(X0,X1,T0)&inv_Make_optimistic_comment(X1,X2,T1)&Praise_or_endorse(X2,X1,T2)\n'
-'\tinv_Provide_humanitarian_aid(X0,X1,T1)<-inv_Engage_in_diplomatic_cooperation(X0,X1,T0)\n'
-'\tinv_Provide_humanitarian_aid(X0,X2,T3)<-Carry_out_suicide_bombing(X0,X1,T0)&inv_Engage_in_material_cooperation(X1,X2,T1)\n'
-
-'Generated High Quality Temporal Logical Rules:\n'
-'\tinv_Provide_humanitarian_aid(X0,X2,T3)<-inv_Criticize_or_denounce(X0,X1,T0)&Threaten(X1,X0,T1)&Bring_lawsuit_against(X0,X2,T2)\n'
-'\tinv_Provide_humanitarian_aid(X0,X1,T1)<-inv_Provide_aid(X0,X1,T0)\n'
-'\tinv_Provide_humanitarian_aid(X0,X1,T3)<-Criticize_or_denounce(X0,X1,T0)&Sign_formal_agreement(X1,X2,T1)&Sign_formal_agreement(X2,X1,T2)\n\n'
-
-'Rule head: inv_Engage_in_negotiation(X0,Xl,Tl)\n'
-'Low Quality Temporal Logic Rules:\n'
-'\tinv_Engage_in_negotiation(X0,X2,T3)<-inv_Make_statement(X0,X1,T0)&Make_statement(X1,X0,T1)&Investigate(X0,X2,T2)\n'
-'\tinv_Engage_in_negotiation(X0,X1,T3)<-inv_Meet_at_a_\'third\'_location(X0,X1,T0)&Discuss_by_telephone(X1,X0,T1)&inv_Consult(X0,X1,T2)\n'
-'\tinv_Engage_in_negotiation(X0,X1,T1)<-Appeal_for_diplomatic_cooperation_(such_as_policy_support)(X0,X1,T0)\n'
-
-
-'Generated High Quality Temporal Logical Rules:\n'
-'\tinv_Engage_in_negotiation(X0,X1,T1)<-Express_intent_to_cooperate(X0,X1,T0)\n'
-'\tinv_Engage_in_negotiation(X0,X2,T2)<-Consult(X0,X1,T0)&Make_statement(X1,X2,T1)\n'
-'\tinv_Engage_in_negotiation(X0,X1,T3)<-inv_Consult(X0,X1,T0)&Host_a_visit(X1,X2,T1)&Make_a_visit(X2,X1,T2)\n'
-'\tinv_Engage_in_negotiation(X0,X2,T3)<-Make_statement(X0,X1,T0)&inv_Make_statement(X1,X0,T1)&Express_intent_to_meet_or_negotiate(X0,X2,T2)\n\n')
-
-prompt_dict['iteration']['low_quality_example'] = ('Low Quality Temporal Logic Rules:\n')
-
-prompt_dict['iteration']['sampled_rules'] = ('Sampled Temporal Logic Rules:\n')
-
-prompt_dict['iteration']['predict'] = (
-    'Let\'s think step-by-step. Please refine the low-quality temporal logic rules into high-quality rules related to "{head}(X0,Xl,Tl)" based on sampled temporal logic rules.\n\n')
-
-
-prompt_dict['iteration']['return'] = 'For the relations in rule body, you are going to choose from the following candidates: {candidate_rels}.\n\n Return the rules only without any explanations.'
-
-
-"............................................................................................................"
-
-prompt_dict['iteration_context'] = ('You are an automated reasoning engine and possess the capability to refine and transform low-quality temporal logic rules into high-quality ones. Please generate rules corresponding to the specific logical form "{head}(X0,Xl,Tl)" that are consistent with the definitions of temporal logic rules.\n\n'
-
-'Here are a few examples:\n'
-'head: Make_a_visit(X0,Xl,Tl)\n'
-'Low Quality Temporal Logic Rules:\n'
-'Make_a_visit(X0,X1,T1)<-Provide_military_protection_or_peacekeeping(X0,X1,T0)\n'
-'Make_a_visit(X0,X1,T3)<-Appeal_for_diplomatic_cooperation_(such_as_policy_support)(X0,X1,T0)&inv_Consult(X1,X2,T1)&inv_Make_statement(X2,X1,T2)\n'
-'Make_a_visit(X0,X3,T3)<-inv_Host_a_visit(X0,X1,T0)&inv_Mobilize_or_increase_armed_forces(X1,X2,T1)&Express_intent_to_de-escalate_military_engagement(X2,X3,T2)\n'
-'Make_a_visit(X0,X2,T2)<-inv_Express_intent_to_meet_or_negotiate(X0,X1,T0)&inv_Make_statement(X1,X2,T1)\n\n'
-
-'Generate High Quality Temporal Logical Rules:\n'                                  
-'Make_a_visit(X0,X1,T1)<-Make_a_visit(X0,X1,T0)\n'
-'Make_a_visit(X0,X2,T2)<-Express_intent_to_meet_or_negotiate(X0,X1,T0)&Make_a_visit(X1,X2,T1)\n'
-'Make_a_visit(X0,X3,T3)<-Consult(X0,X1,T0)&Engage_in_negotiation(X1,X2,T1)&Make_a_visit(X2,X3,T2)\n'
-'Make_a_visit(X0,X2,T3)<-Engage_in_negotiation(X0,X1,T0)&inv_Make_statement(X1,X0,T1)&inv_Host_a_visit(X0,X2,T2)\n'
-'Make_a_visit(X0,X1,T3)<-Meet_at_a_\'third\'_location(X0,X1,T0)&Host_a_visit(X1,X2,T1)&Make_a_visit(X2,X1,T2)\n'
-'Make_a_visit(X0,X3,T3)<-Make_statement(X0,X1,T0)&Express_intent_to_meet_or_negotiate(X1,X2,T1)&inv_Host_a_visit(X2,X3,T2)\n\n'
-
-'head: inv_Provide_humanitarian_aid(X0,Xl,Tl)\n'
-'Low Quality Temporal Logic Rules:\n'
-'inv_Provide_humanitarian_aid(X0,X1,T3)<-inv_Investigate(X0,X1,T0)&inv_Make_optimistic_comment(X1,X2,T1)&Praise_or_endorse(X2,X1,T2)\n'
-'inv_Provide_humanitarian_aid(X0,X1,T1)<-inv_Engage_in_diplomatic_cooperation(X0,X1,T0)\n'
-'inv_Provide_humanitarian_aid(X0,X2,T3)<-Carry_out_suicide_bombing(X0,X1,T0)&inv_Engage_in_material_cooperation(X1,X2,T1)\n'                            
-'inv_Provide_humanitarian_aid(X0,X3,T3)<-inv_Criticize_or_denounce(X0,X1,T0)&inv_Demand(X1,X2,T1)&Make_a_visit(X2,X3,T2)\n'
-'inv_Provide_humanitarian_aid(X0,X2,T2)<-Make_a_visit(X0,X1,T0)&Make_a_visit(X1,X2,T1)\n\n'
-
-'Generate High Quality Temporal Logical Rules:\n'
-'inv_Provide_humanitarian_aid(X0,X2,T3)<-inv_Criticize_or_denounce(X0,X1,T0)&Threaten(X1,X0,T1)&Bring_lawsuit_against(X0,X2,T2)\n'
-'inv_Provide_humanitarian_aid(X0,X1,T1)<-inv_Provide_aid(X0,X1,T0)\n'
-'inv_Provide_humanitarian_aid(X0,X1,T3)<-Criticize_or_denounce(X0,X1,T0)&Sign_formal_agreement(X1,X2,T1)&Sign_formal_agreement(X2,X1,T2)\n'
-'inv_Provide_humanitarian_aid(X0,X2,T2)<-Make_an_appeal_or_request(X0,X1,T0)&inv_Consult(X1,X2,T1)\n'
-'inv_Provide_humanitarian_aid(X0,X3,T3)<-inv_Return,_release_person(s)(X0,X1,T0)&Return,_release_person(s)(X1,X2,T1)&Accuse(X2,X3,T2)\n\n'
-
-'head: inv_Engage_in_negotiation(X0,Xl,Tl)\n'
-'Low Quality Temporal Logic Rules:\n'
-'inv_Engage_in_negotiation(X0,X2,T3)<-inv_Make_statement(X0,X1,T0)&Make_statement(X1,X0,T1)&Investigate(X0,X2,T2)\n'
-'inv_Engage_in_negotiation(X0,X1,T3)<-inv_Meet_at_a_\'third\'_location(X0,X1,T0)&Discuss_by_telephone(X1,X0,T1)&inv_Consult(X0,X1,T2)\n'
-'inv_Engage_in_negotiation(X0,X1,T1)<-Appeal_for_diplomatic_cooperation_(such_as_policy_support)(X0,X1,T0)\n'
-'inv_Engage_in_negotiation(X0,X2,T2)<-Make_an_appeal_or_request(X0,X1,T0)&inv_Threaten(X1,X2,T1)\n'
-'inv_Engage_in_negotiation(X0,X3,T3)<-Praise_or_endorse(X0,X1,T0)&inv_Praise_or_endorse(X1,X2,T1)&inv_Make_statement(X2,X3,T2)\n\n'
-
-
-'Generate High Quality Temporal Logical Rules:\n'
-'inv_Engage_in_negotiation(X0,X1,T1)<-Express_intent_to_cooperate(X0,X1,T0)\n'
-'inv_Engage_in_negotiation(X0,X2,T2)<-Consult(X0,X1,T0)&Make_statement(X1,X2,T1)\n'
-'inv_Engage_in_negotiation(X0,X1,T3)<-inv_Consult(X0,X1,T0)&Host_a_visit(X1,X2,T1)&Make_a_visit(X2,X1,T2)\n'
-'inv_Engage_in_negotiation(X0,X2,T3)<-Make_statement(X0,X1,T0)&inv_Make_statement(X1,X0,T1)&Express_intent_to_meet_or_negotiate(X0,X2,T2)\n'
-'inv_Engage_in_negotiation(X0,X3,T3)<-Express_intent_to_meet_or_negotiate(X0,X1,T0)&Consult(X1,X2,T1)&Express_intent_to_cooperate(X2,X3,T2)\n\n')
-
-# prompt_dict['rel_id']['answer']='Please answer\n'
-prompt_dict['rel_id'] = {}
-prompt_dict['rel_id']['Few_context_for_chain'] = "chain rules:\n"
-prompt_dict['rel_id']['Few_context_for_subgraph'] = "subgraphs:\n"
-
-prompt_dict['rel_name'] = {}
-prompt_dict['rel_name']['Few_context_for_chain'] = "chain rules:\n"
-prompt_dict['rel_name']['Few_context_for_subgraph'] = "subgraphs:\n"
-
-prompt_dict['Final_predict'] = (
-    '\n\nLet\'s think step-by-step, and based on the above chain rules, please generate as many as possible most relevant temporal rules that are relative to "{head}(X,Y,T)".\n\n')
-prompt_dict[
-    'return'] = 'For the relations in rule body, you are going to choose from the following candidates: {candidate_rels}.\n\n Return the rules only without any explanations.'
-
-prompt_dict['low_quality_example']=('The following low quality temporal logic rules were generated previously by you. The reasons for being evaluated as low-quality are:\n'
-                                    '1. They only apply to the training data and lack generalization ability for unseen data.\n'
-                                    '2. Noise or errors present in the original data.\n\n'
-                                    'Low Quality Temporal Logic Rules:\n')
-
-prompt_dict['interaction_Finale_predict']=('Let\'s think step-by-step. Please regenerate as many precise and effective temporal logic rules as possible that are related to "{head}(X0,Xl,Tl)", while avoiding the generation of the previously mentioned low-quality temporal logic rules.\n\n')
-
-prompt_dict['iteration_neg_rules'] = (
-    'The above is a set of temporal logic rules that you have previously generated. However, upon evaluation, it has been found that the quality of these rules is not sufficient to meet the application requirements in real-world scenarios. To enhance the accuracy and applicability of the rules, please regenerate more precise and effective temporal logic rules based on the following chain rules.\n')
-
-prompt_dict['unknown_relation_context_0'] = (
-    'You are an automated reasoning engine, and can generate as many most relevant temporal logic rules corresponding to the "{head}(X0,Xl,Tl)", ensuring they conform to the definition of temporal logic rules.\n\n'
-    
-    'Here are a few examples:\n'
-    'head: Make_a_visit(X0,Xl,Tl)\n'
-    'Make_a_visit(X0,X1,T1)<-Make_a_visit(X0,X1,T0) # X0 has a relation "Make_a_visit“ with X1 at time T1, if X0 has a relation “Make_a_visit” with X1 at time T0.\n'
-    'Make_a_visit(X0,X2,T2)<-Express_intent_to_meet_or_negotiate(X0,X1,T0)&Make_a_visit(X1,X2,T1) # X0 has a relation “Make_a_visit” with X2 at time T2, if X0 has a relation “Express_intent_to_meet_or_negotiate” with X1 at time T0, X1 has a relation “Make_a_visit” with X2 at time T1.\n'
-    'Make_a_visit(X0,X3,T3)<-Make_statement(X0,X1,T0)&Express_intent_to_meet_or_negotiate(X1,X2,T1)&inv_Host_a_visit(X2,X3,T2) # X0 has a relation “Make_a_visit” with X3 at time T3, if X0 has a relation “Make_statement” with X1 at time T0, X1 has a relation “Express_intent_to_meet_or_negotiate” with X2 at time T1, and X2 has a relation “inv_Host_a_visit” with X3 at time T2.\n\n'
-    
-    'head: inv_Provide_humanitarian_aid(X0,Xl,Tl)\n'
-    'inv_Provide_humanitarian_aid(X0,X2,T3)<-inv_Criticize_or_denounce(X0,X1,T0)&Threaten(X1,X0,T1)&Bring_lawsuit_against(X0,X2,T2) # X0 has a relation “inv_Provide_humanitarian_aid” with X2 at time T3, if X0 has a relation “inv_Criticize_or_denounce” with X1 at time T0, X1 has a relation “Threaten” with X0 at time T1, and X0 has a relation “Bring_lawsuit_against” with X2 at time T2.\n'
-    'inv_Provide_humanitarian_aid(X0,X1,T1)<-inv_Provide_aid(X0,X1,T0) # X0 has a relation “inv_Provide_humanitarian_aid” with X1 at time T1, if X0 has a relation “inv_Provide_aid” with X1 at time T0\n'
-    'inv_Provide_humanitarian_aid(X0,X2,T2)<-Make_an_appeal_or_request(X0,X1,T0)&inv_Consult(X1,X2,T1) # X0 has a relation “inv_Provide_humanitarian_aid” with X2 at time T2, if X0 has a relation “Make_an_appeal_or_request” with X1 at time T0, X1 has a relation “inv_Consult” with X2 at time T1.\n'
-    'inv_Provide_humanitarian_aid(X0,X3,T3)<-inv_Return,_release_person(s)(X0,X1,T0)&Return,_release_person(s)(X1,X2,T1)&Accuse(X2,X3,T2) # X0 has a relation “inv_Provide_humanitarian_aid” with X3 at time T3, if X0 has a relation “inv_Return,_release_person(s)” with X1 at time T0, X1 has a relation “Return,_release_person(s)” with X2 at time T1, and X2 has a relation “Accuse” with X3 at time T2.\n\n'
-)
-
-prompt_dict['unknown_relation_context'] = (
-    'You are an automated reasoning engine, and can generate as many most relevant temporal logic rules corresponding to the "{head}(X0,Xl,Tl)", ensuring they conform to the definition of temporal logic rules.\n\n'
-
-    'Here are a few examples:\n'
-    'Make_a_visit(X0,X1,T1)<-Make_a_visit(X0,X1,T0) # X0 has a relation "Make_a_visit“ with X1 at time T1, if X0 has a relation “Make_a_visit” with X1 at time T0.\n'
-    'Make_a_visit(X0,X2,T2)<-Express_intent_to_meet_or_negotiate(X0,X1,T0)&Make_a_visit(X1,X2,T1) # X0 has a relation “Make_a_visit” with X2 at time T2, if X0 has a relation “Express_intent_to_meet_or_negotiate” with X1 at time T0, X1 has a relation “Make_a_visit” with X2 at time T1.\n'
-    'Make_a_visit(X0,X3,T3)<-Make_statement(X0,X1,T0)&Express_intent_to_meet_or_negotiate(X1,X2,T1)&inv_Host_a_visit(X2,X3,T2) # X0 has a relation “Make_a_visit” with X3 at time T3, if X0 has a relation “Make_statement” with X1 at time T0, X1 has a relation “Express_intent_to_meet_or_negotiate” with X2 at time T1, and X2 has a relation “inv_Host_a_visit” with X3 at time T2.\n\n'
-
-    'inv_Provide_humanitarian_aid(X0,X2,T3)<-inv_Criticize_or_denounce(X0,X1,T0)&Threaten(X1,X0,T1)&Bring_lawsuit_against(X0,X2,T2) # X0 has a relation “inv_Provide_humanitarian_aid” with X2 at time T3, if X0 has a relation “inv_Criticize_or_denounce” with X1 at time T0, X1 has a relation “Threaten” with X0 at time T1, and X0 has a relation “Bring_lawsuit_against” with X2 at time T2.\n'
-    'inv_Provide_humanitarian_aid(X0,X1,T1)<-inv_Provide_aid(X0,X1,T0) # X0 has a relation “inv_Provide_humanitarian_aid” with X1 at time T1, if X0 has a relation “inv_Provide_aid” with X1 at time T0\n'
-    'inv_Provide_humanitarian_aid(X0,X2,T2)<-Make_an_appeal_or_request(X0,X1,T0)&inv_Consult(X1,X2,T1) # X0 has a relation “inv_Provide_humanitarian_aid” with X2 at time T2, if X0 has a relation “Make_an_appeal_or_request” with X1 at time T0, X1 has a relation “inv_Consult” with X2 at time T1.\n'
-    'inv_Provide_humanitarian_aid(X0,X3,T3)<-inv_Return,_release_person(s)(X0,X1,T0)&Return,_release_person(s)(X1,X2,T1)&Accuse(X2,X3,T2) # X0 has a relation “inv_Provide_humanitarian_aid” with X3 at time T3, if X0 has a relation “inv_Return,_release_person(s)” with X1 at time T0, X1 has a relation “Return,_release_person(s)” with X2 at time T1, and X2 has a relation “Accuse” with X3 at time T2.\n\n'
-)
-
-prompt_dict['unknown_relation_final_predict'] = (
-    '\n\nLet\'s think step-by-step, please generate as many as possible most relevant temporal rules that are relative to "{head}(X0,Xl,Tl)".\n\n')
-prompt_dict[
-    'unknown_relation_return'] = (
-    'For the relations in rule body, you are going to choose from the following candidates: {candidate_rels}.\n\n'
-    'Return the rules only without any explanations.')
-
-
-"......................................................."
-prompt_dict['chain_defination_for_high'] = (
-    'The defination of Temporal Logical Rules:\n Temporal Logical Rules "{head}(X0,Xl,Tl)<-R1(X0,X1,T0)&...&Rl(X(l-1),Xl,T(l-1))" are rules used in temporal knowledge graph reasoning to predict relations between entities over time. They describe how the relation "{head}" between entities "X0" and "Xl" evolves from past time steps "Ti (i={{0,...,(l-1)}})"(rule body) to the next "Tl" (rule head), strictly following the constraint "T0 <= ··· <= T(l-1) < Tl".\n\n')
-
-prompt_dict['iteration_context_for_high'] = ('As an expert in knowledge graph reasoning, you need to use high-quality temporal logic rules from the validation dataset to guide the large language model, aiming to generate temporal logic rules that match the distribution of an unknown test dataset.\n\n'
-
-)
-
-
-prompt_dict['example_for_high']=('Existing High Quality Rules:\n')
-prompt_dict['interaction_finale_predict_for_high']=('Please think step by step and, based on the above rules, please generate as many high-quality temporal logic rules as possible that correspond to the distribution of an unknown test dataset.\n\n')
-prompt_dict['return_for_high'] = 'For the relations in rule body, you are going to choose from the following candidates: {candidate_rels}.\n\n Return the rules only without any explanations.'
-
 def read_paths(path):
     results = []
     with open(path, "r") as f:
@@ -281,11 +27,12 @@ def read_paths(path):
 
 
 def build_prompt(head, prompt_dict):
-    context = prompt_dict['first']['context'].format(head=head)
-    chain = prompt_dict['first']['chain']
-    predict = prompt_dict['first']['predict'].format(head=head)
-    return_rules = prompt_dict['first']['return']
-    return context + chain, predict, return_rules
+    definition = prompt_dict['common']['definition'].format(head=head)
+    context = prompt_dict['common']['context'].format(head=head)
+    chain = prompt_dict['common']['chain']
+    predict = prompt_dict['common']['predict'].format(head=head)
+    return_rules = prompt_dict['common']['return']
+    return definition + context + chain, predict, return_rules
 
 def build_prompt_for_zero(head, prompt_dict):
     context = prompt_dict['zero']['context'].format(head=head)
@@ -355,7 +102,7 @@ def get_rule_format(head, path, kg_rules_path):
 
 
 def generate_rule(row, rdict, rule_path, kg_rules_path, model, args, relation_regex,
-                  similiary_rel_dict):
+                  similiary_rel_dict, prompt_info_dict):
     relation2id = rdict.rel2idx
     head = row["head"]
     paths = row["paths"]
@@ -378,7 +125,7 @@ def generate_rule(row, rdict, rule_path, kg_rules_path, model, args, relation_re
             f"""Cannot implement for zero-shot(f=0) and generate zero(k=0) rules."""
         )
     # Build prompt excluding rules
-    fixed_context, predict, return_rules = build_prompt(head_formate, prompt_dict)
+    fixed_context, predict, return_rules = build_prompt(head_formate, prompt_info_dict)
     current_prompt = fixed_context + predict + return_rules
 
     if args.is_zero:  # For zero-shot setting
@@ -456,11 +203,11 @@ def generate_rule(row, rdict, rule_path, kg_rules_path, model, args, relation_re
                             fail_rule_file.write(prompt + "\n")
                         break
 
-def generate_rule_for_zero(head, rdict, rule_path, model, args):
+def generate_rule_for_zero(head, rdict, rule_path, model, args, prompt_info_zero_dict):
     relation2id = rdict.rel2idx
     all_rels = list(relation2id.keys())
 
-    fixed_context, predict, return_rules_template = build_prompt_for_zero(head, prompt_dict)
+    fixed_context, predict, return_rules_template = build_prompt_for_zero(head, prompt_info_zero_dict)
     return_rules = return_rules_template.format(candidate_rels=all_rels)
     current_prompt = fixed_context + predict + return_rules
 
@@ -835,7 +582,10 @@ def load_data_and_paths(args):
     sampled_path_dir = os.path.join(args.sampled_paths, args.dataset)
     sampled_path = read_paths(os.path.join(sampled_path_dir, "closed_rel_paths.jsonl"))
 
-    return dataset, sampled_path, sampled_path_with_valid_dir, sampled_path_dir
+    prompt_path = os.path.join(args.prompt_paths, 'common.json')
+    prompt_path_for_zero = os.path.join(args.prompt_paths, 'zero.json')
+
+    return dataset, sampled_path, sampled_path_with_valid_dir, sampled_path_dir, prompt_path, prompt_path_for_zero
 
 
 def prepare_rule_heads(dataset, sampled_path):
@@ -885,11 +635,14 @@ def create_directories(args):
 
 
 def main(args, LLM):
-    dataset, sampled_path, sampled_path_with_valid_dir, sampled_path_dir = load_data_and_paths(args)
+    dataset, sampled_path, sampled_path_with_valid_dir, sampled_path_dir, prompt_path, prompt_path_for_zero = load_data_and_paths(args)
     rule_head_without_zero, rule_head_with_zero = prepare_rule_heads(dataset, sampled_path)
     kg_rules_path = determine_kg_rules_path(args, sampled_path_dir)
     rdict, relation_regex, similar_rel_dict = load_configuration(dataset, sampled_path_dir, args)
     rule_path, filter_rule_path = create_directories(args)
+
+    prompt_info_dict = load_json_data(prompt_path)
+    prompt_info_zero_dict = load_json_data(prompt_path_for_zero)
 
     model = LLM(args)
     print("Preparing pipeline for inference...")
@@ -897,11 +650,11 @@ def main(args, LLM):
 
     llm_rule_generate(
         args, filter_rule_path, kg_rules_path, model, rdict, relation_regex, rule_path,
-        sampled_path, similar_rel_dict, sampled_path_with_valid_dir, rule_head_with_zero
+        sampled_path, similar_rel_dict, sampled_path_with_valid_dir, rule_head_with_zero, prompt_info_dict, prompt_info_zero_dict
     )
 
 def llm_rule_generate(args, filter_rule_path, kg_rules_path, model, rdict, relation_regex, rule_path,
-                      sampled_path, similiary_rel_dict, sampled_path_with_valid_dir, rule_head_with_zero):
+                      sampled_path, similiary_rel_dict, sampled_path_with_valid_dir, rule_head_with_zero, prompt_info_dict, prompt_info_zero_dict):
     # Generate rules
     with ThreadPool(args.n) as p:
         for _ in tqdm(
@@ -914,7 +667,8 @@ def llm_rule_generate(args, filter_rule_path, kg_rules_path, model, rdict, relat
                         model=model,
                         args=args,
                         relation_regex=relation_regex,
-                        similiary_rel_dict=similiary_rel_dict
+                        similiary_rel_dict=similiary_rel_dict,
+                        prompt_info_dict=prompt_info_dict
                     ),
                     sampled_path,
                 ),
@@ -930,7 +684,8 @@ def llm_rule_generate(args, filter_rule_path, kg_rules_path, model, rdict, relat
                         rdict=rdict,
                         rule_path=rule_path,
                         model=model,
-                        args=args
+                        args=args,
+                        prompt_info_zero_dict=prompt_info_zero_dict
                     ),
                     rule_head_with_zero,
                 ),
@@ -1802,6 +1557,7 @@ def parse_arguments():
     parser.add_argument("--data_path", type=str, default="datasets", help="Data directory")
     parser.add_argument("--dataset", type=str, default="family", help="Dataset name")
     parser.add_argument("--sampled_paths", type=str, default="sampled_path", help="Sampled path directory")
+    parser.add_argument("--prompt_paths", type=str, default="prompt", help="Sampled path directory")
     parser.add_argument("--rule_path", type=str, default="gen_rules_iteration", help="Path to rule file")
     parser.add_argument("--model_name", type=str, default="gpt-3.5-turbo", help="Model name")
     parser.add_argument("--is_zero", action="store_true", help="Enable zero-shot rule generation")
