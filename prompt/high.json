@@ -1,0 +1,7 @@
+{
+    "chain_defination_for_high": "The defination of Temporal Logical Rules:\n Temporal Logical Rules \"{head}(X0,Xl,Tl)<-R1(X0,X1,T0)&...&Rl(X(l-1),Xl,T(l-1))\" are rules used in temporal knowledge graph reasoning to predict relations between entities over time. They describe how the relation \"{head   }\" between entities \"X0\" and \"Xl\" evolves from past time steps \"Ti (i={{0,...,(l-1)}})\"(rule body) to the next \"Tl\" (rule head), strictly following the constraint \"T0 <= ··· <= T(l-1) < Tl\".\n\n",
+    "iteration_context_for_high": "As an expert in knowledge graph reasoning, you need to use high-quality temporal logic rules from the validation dataset to guide the large language model, aiming to generate temporal logic rules that match the distribution of an unknown test dataset.\n\n",
+    "example_for_high": "Existing High Quality Rules:\n",
+    "interaction_finale_predict_for_high": "Please think step by step and, based on the above rules, please generate as many high-quality temporal logic rules as possible that correspond to the distribution of an unknown test dataset.\n\n",
+    "return_for_high": "For the relations in rule body, you are going to choose from the following candidates: {candidate_rels}.\n\n Return the rules only without any explanations."
+}

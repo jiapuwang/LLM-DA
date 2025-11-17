@@ -2,6 +2,7 @@ import argparse
 import glob
 import os.path
 import traceback
+import time
 from difflib import get_close_matches
 
 from tqdm import tqdm
@@ -17,6 +18,7 @@ from rule_learning import Rule_Learner, rules_statistics
 
 from concurrent.futures import ThreadPoolExecutor
 from params import str_to_bool
+
 
 def read_paths(path):
     results = []
@@ -34,6 +36,7 @@ def build_prompt(head, prompt_dict):
     return_rules = prompt_dict['common']['return']
     return definition + context + chain, predict, return_rules
 
+
 def build_prompt_for_zero(head, prompt_dict):
     context = prompt_dict['zero']['context'].format(head=head)
     predict = prompt_dict['zero']['predict'].format(head=head)
@@ -43,16 +46,19 @@ def build_prompt_for_zero(head, prompt_dict):
 
 def build_prompt_based_high(head, candidate_rels, is_zero, args, prompt_dict):
     # head = clean_symbol_in_rel(head)
-    chain_defination = prompt_dict['chain_defination_for_high'].format(head=head)
+    chain_defination = prompt_dict['chain_defination_for_high'].format(
+        head=head)
 
     context = prompt_dict['iteration_context_for_high'].format(head=head)
 
     high_quality_context = prompt_dict['example_for_high']
     # predict = prompt_dict['interaction_finale_predict_for_high'].format(head=head, k=20)
-    predict = prompt_dict['interaction_finale_predict_for_high'].format(head=head)
+    predict = prompt_dict['interaction_finale_predict_for_high'].format(
+        head=head)
     return_rules = prompt_dict['return_for_high']
 
     return chain_defination + context + high_quality_context, predict, return_rules
+
 
 def build_prompt_based_low(head, candidate_rels, is_zero, args, prompt_dict):
     # head = clean_symbol_in_rel(head)
@@ -63,7 +69,8 @@ def build_prompt_based_low(head, candidate_rels, is_zero, args, prompt_dict):
     sampled_rules = prompt_dict['iteration']['sampled_rules']
     predict = prompt_dict['iteration']['predict'].format(head=head)
     return_rules = prompt_dict['iteration']['return']
-    return  context + low_quality_context, sampled_rules,predict, return_rules
+    return context + low_quality_context, sampled_rules, predict, return_rules
+
 
 def build_prompt_for_unknown(head, candidate_rels, is_zero, args, prompt_dict):
     # head = clean_symbol_in_rel(head)
@@ -125,7 +132,8 @@ def generate_rule(row, rdict, rule_path, kg_rules_path, model, args, relation_re
             f"""Cannot implement for zero-shot(f=0) and generate zero(k=0) rules."""
         )
     # Build prompt excluding rules
-    fixed_context, predict, return_rules = build_prompt(head_formate, prompt_info_dict)
+    fixed_context, predict, return_rules = build_prompt(
+        head_formate, prompt_info_dict)
     current_prompt = fixed_context + predict + return_rules
 
     if args.is_zero:  # For zero-shot setting
@@ -146,9 +154,11 @@ def generate_rule(row, rdict, rule_path, kg_rules_path, model, args, relation_re
             for i in range(args.l):
 
                 if args.select_with_confidence is True:
-                    sorted_list = sorted(path_content_list, key=lambda x: float(x.split('&')[-1]), reverse=True)
+                    sorted_list = sorted(path_content_list, key=lambda x: float(
+                        x.split('&')[-1]), reverse=True)
                     # few_shot_samples = sorted_list[:args.f]
-                    new_shot_samples = [item for item in sorted_list if float(item.split('&')[-1]) > 0.01]
+                    new_shot_samples = [item for item in sorted_list if float(
+                        item.split('&')[-1]) > 0.01]
                     if len(new_shot_samples) >= args.f:
                         few_shot_samples = new_shot_samples
                     else:
@@ -171,9 +181,11 @@ def generate_rule(row, rdict, rule_path, kg_rules_path, model, args, relation_re
 
                     condicate = similiary_rel_set.union(relation_set)
 
-                    formatted_string = ';'.join([f'{name}' for name in condicate])
+                    formatted_string = ';'.join(
+                        [f'{name}' for name in condicate])
 
-                return_rules = return_rules.format(candidate_rels=formatted_string)
+                return_rules = return_rules.format(
+                    candidate_rels=formatted_string)
 
                 temp_current_prompt = fixed_context + predict + return_rules
 
@@ -183,7 +195,8 @@ def generate_rule(row, rdict, rule_path, kg_rules_path, model, args, relation_re
                 )
 
                 if not few_shot_paths:
-                    raise ValueError("few_shot_paths is empty, head:{}".format(head))
+                    raise ValueError(
+                        "few_shot_paths is empty, head:{}".format(head))
 
                 few_shot_paths = few_shot_paths + "\n\n"
 
@@ -203,11 +216,13 @@ def generate_rule(row, rdict, rule_path, kg_rules_path, model, args, relation_re
                             fail_rule_file.write(prompt + "\n")
                         break
 
+
 def generate_rule_for_zero(head, rdict, rule_path, model, args, prompt_info_zero_dict):
     relation2id = rdict.rel2idx
     all_rels = list(relation2id.keys())
 
-    fixed_context, predict, return_rules_template = build_prompt_for_zero(head, prompt_info_zero_dict)
+    fixed_context, predict, return_rules_template = build_prompt_for_zero(
+        head, prompt_info_zero_dict)
     return_rules = return_rules_template.format(candidate_rels=all_rels)
     current_prompt = fixed_context + predict + return_rules
 
@@ -270,7 +285,7 @@ def extract_and_expand_relations(args, path_content_list, similiary_rel_dict, re
 
 def generate_rule_for_iteration_by_multi_thread(row, rdict, rule_path, kg_rules_path, model, args,
                                                 relation_regex,
-                                                similiary_rel_dict, kg_rules_path_with_valid):
+                                                similiary_rel_dict, kg_rules_path_with_valid, prompt_dict_for_low, prompt_dict_for_high):
     relation2id = rdict.rel2idx
     head = row["head"]
     rules = row["rules"]
@@ -295,14 +310,14 @@ def generate_rule_for_iteration_by_multi_thread(row, rdict, rule_path, kg_rules_
             f"""Cannot implement for zero-shot(f=0) and generate zero(k=0) rules."""
         )
 
-    if args.based_rule_type ==  'low':
+    if args.based_rule_type == 'low':
         # Build prompt excluding rules
         fixed_context, sampled_rules, predict, return_rules = build_prompt_based_low(
-            head_formate, candidate_rels, args.is_zero, args, prompt_dict
+            head_formate, candidate_rels, args.is_zero, args, prompt_dict_for_low
         )
     else:
         fixed_context, predict, return_rules = build_prompt_based_high(
-            head_formate, candidate_rels, args.is_zero, args, prompt_dict
+            head_formate, candidate_rels, args.is_zero, args, prompt_dict_for_high
         )
 
     kg_rules_dict = load_json_data(kg_rules_path)
@@ -314,12 +329,14 @@ def generate_rule_for_iteration_by_multi_thread(row, rdict, rule_path, kg_rules_
         for i in range(args.second):
 
             if path_content_list is not None:
-                condicate = extract_and_expand_relations(args, path_content_list, similiary_rel_dict, relation_regex)
+                condicate = extract_and_expand_relations(
+                    args, path_content_list, similiary_rel_dict, relation_regex)
             else:
                 condicate = set(all_rels)
 
             temp_valid_rules = valid_rules_name.get(head, '')
-            valid_rules_with_head = random.sample(temp_valid_rules,  min(20, len(temp_valid_rules)))
+            valid_rules_with_head = random.sample(
+                temp_valid_rules,  min(20, len(temp_valid_rules)))
 
             temp_rules = random.sample(rules, min(20, len(rules)))
             quitity_string = ''.join(temp_rules)
@@ -328,8 +345,8 @@ def generate_rule_for_iteration_by_multi_thread(row, rdict, rule_path, kg_rules_
             valid_rules_string = ''.join(valid_rules_with_head)
             valid_rules_string = valid_rules_string + '\n'
 
-
-            temp_current_prompt = fixed_context + quitity_string + valid_rules_string + predict
+            temp_current_prompt = fixed_context + \
+                quitity_string + valid_rules_string + predict
 
             formatted_string = iteration_check_prompt_length(
                 temp_current_prompt,
@@ -351,59 +368,59 @@ def generate_rule_for_iteration_by_multi_thread(row, rdict, rule_path, kg_rules_
                     with open(os.path.join(rule_path, f"fail_{file_name}.txt"), "w") as fail_rule_file:
                         fail_rule_file.write(prompt + "\n")
 
-def generate_rule_for_unknown_relation_by_multi_thread(row, rdict, rule_path, kg_rules_path, model, args, relation_subgraph,
-                                                relation_regex,
-                                                similiary_rel_dict):
-    relation2id = rdict.rel2idx
-    head = row
+# def generate_rule_for_unknown_relation_by_multi_thread(row, rdict, rule_path, kg_rules_path, model, args, relation_subgraph,
+#                                                 relation_regex,
+#                                                 similiary_rel_dict):
+#     relation2id = rdict.rel2idx
+#     head = row
 
-    head_id = relation2id[head]
-    # print("Head: ", head)
+#     head_id = relation2id[head]
+#     # print("Head: ", head)
 
-    head_formate = head
-    if args.is_rel_name is True:
-        all_rels = list(relation2id.keys())
-        candidate_rels = ", ".join(all_rels)
-        head_formate = head
-    else:
-        all_rels = list(relation2id.values())
-        str_list = [str(item) for item in all_rels]
-        candidate_rels = ", ".join(str_list)
-        head_formate = head_id
+#     head_formate = head
+#     if args.is_rel_name is True:
+#         all_rels = list(relation2id.keys())
+#         candidate_rels = ", ".join(all_rels)
+#         head_formate = head
+#     else:
+#         all_rels = list(relation2id.values())
+#         str_list = [str(item) for item in all_rels]
+#         candidate_rels = ", ".join(str_list)
+#         head_formate = head_id
 
-    # Build prompt excluding rules
-    fixed_context, predict, return_rules = build_prompt_for_unknown(
-        head_formate, candidate_rels, args.is_zero, args, prompt_dict
-    )
+#     # Build prompt excluding rules
+#     fixed_context, predict, return_rules = build_prompt_for_unknown(
+#         head_formate, candidate_rels, args.is_zero, args, prompt_dict
+#     )
 
-    file_name = head.strip()
-    with open(os.path.join(rule_path, f"{file_name}.txt"), "w") as rule_file, open(
-            os.path.join(rule_path, f"{file_name}.query"), "w") as query_file:
-        rule_file.write(f"Rule_head: {head}\n")
-        for i in range(args.second):
-            # # Convert list elements to the desired string format
-            # formatted_string = ';'.join([f'{name}' for name in condicate])
+#     file_name = head.strip()
+#     with open(os.path.join(rule_path, f"{file_name}.txt"), "w") as rule_file, open(
+#             os.path.join(rule_path, f"{file_name}.query"), "w") as query_file:
+#         rule_file.write(f"Rule_head: {head}\n")
+#         for i in range(args.second):
+#             # # Convert list elements to the desired string format
+#             # formatted_string = ';'.join([f'{name}' for name in condicate])
 
-            formatted_string = unknown_check_prompt_length(
-                fixed_context + predict, all_rels, return_rules, model
-            )
+#             formatted_string = unknown_check_prompt_length(
+#                 fixed_context + predict, all_rels, return_rules, model
+#             )
 
-            return_rules = return_rules.format(candidate_rels=formatted_string)
+#             return_rules = return_rules.format(candidate_rels=formatted_string)
 
 
-            prompt = fixed_context + predict + return_rules
-            # tqdm.write("Prompt: \n{}".format(prompt))
-            query_file.write(f"Sample {i + 1} time: \n")
-            query_file.write(prompt + "\n")
-            if not args.dry_run:
-                response = model.generate_sentence(prompt)
-                if response is not None:
-                    # tqdm.write("Response: \n{}".format(response))
-                    rule_file.write(f"Sample {i + 1} time: \n")
-                    rule_file.write(response + "\n")
-                else:
-                    with open(os.path.join(rule_path, f"fail_{file_name}.txt"), "w") as fail_rule_file:
-                        fail_rule_file.write(prompt + "\n")
+#             prompt = fixed_context + predict + return_rules
+#             # tqdm.write("Prompt: \n{}".format(prompt))
+#             query_file.write(f"Sample {i + 1} time: \n")
+#             query_file.write(prompt + "\n")
+#             if not args.dry_run:
+#                 response = model.generate_sentence(prompt)
+#                 if response is not None:
+#                     # tqdm.write("Response: \n{}".format(response))
+#                     rule_file.write(f"Sample {i + 1} time: \n")
+#                     rule_file.write(response + "\n")
+#                 else:
+#                     with open(os.path.join(rule_path, f"fail_{file_name}.txt"), "w") as fail_rule_file:
+#                         fail_rule_file.write(prompt + "\n")
 
 
 def copy_files(source_dir, destination_dir, file_extension):
@@ -448,8 +465,10 @@ def process_rules_files(input_dir, output_dir, rdict, relation_regex, error_file
                                     if match[1].strip().isdigit():
                                         rel_id = int(match[1].strip())
                                         if rel_id not in list(rdict.idx2rel):
-                                            print(f"Error relation id:{rel_id}, rule:{rule}")
-                                            f_error_out.write(f"Error relation id:{rel_id}, rule:{rule}")
+                                            print(
+                                                f"Error relation id:{rel_id}, rule:{rule}")
+                                            f_error_out.write(
+                                                f"Error relation id:{rel_id}, rule:{rule}")
                                             sum = sum + 1
                                             is_save = False
                                             break
@@ -465,15 +484,18 @@ def process_rules_files(input_dir, output_dir, rdict, relation_regex, error_file
                                             regrex_name += '&'
                                         rule_by_name += regrex_name
                                     else:
-                                        print(f"Error relation id:{match[1].strip()}, rule:{rule}")
-                                        f_error_out.write(f"Error relation id:{match[1].strip()}, rule:{rule}")
+                                        print(
+                                            f"Error relation id:{match[1].strip()}, rule:{rule}")
+                                        f_error_out.write(
+                                            f"Error relation id:{match[1].strip()}, rule:{rule}")
                                         sum = sum + 1
                                         is_save = False
                                         break
 
                                 else:
                                     print(f"Error rule:{rule}, rule:{rule}")
-                                    f_error_out.write(f"Error rule:{rule}, rule:{rule}")
+                                    f_error_out.write(
+                                        f"Error rule:{rule}, rule:{rule}")
                                     sum = sum + 1
                                     is_save = False
                                     break
@@ -490,7 +512,8 @@ def get_topk_similiary_rel(topk, similary_matrix, transformers_id2rel, transform
     similiary_rel_dict = {}
     for idx, similary_rels in enumerate(top_k_indices):
         rel_name = transformers_id2rel[str(idx)]
-        similary_rel_name = [transformers_id2rel[str(i)] for i in similary_rels]
+        similary_rel_name = [
+            transformers_id2rel[str(i)] for i in similary_rels]
         similiary_rel_dict[rel_name] = similary_rel_name
 
     return similiary_rel_dict
@@ -520,6 +543,7 @@ def get_low_conf(low_conf_file_path, relation_regex, rdict):
 
     return rule_list
 
+
 def get_high_conf(high_conf_file_path, relation_regex, rdict):
     rule_dict = {}
     with open(high_conf_file_path, 'r') as fin_low:
@@ -545,8 +569,6 @@ def get_high_conf(high_conf_file_path, relation_regex, rdict):
     return rule_list
 
 
-
-
 def analysis_data(confidence_folder, kg_rules_path):
     with open(os.path.join(confidence_folder, 'hight_conf.txt'), 'r') as fin_hight, open(
             os.path.join(confidence_folder, 'low_conf.txt'), 'r') as fin_low:
@@ -566,7 +588,8 @@ def analysis_data(confidence_folder, kg_rules_path):
 
     rules_dict = load_json_data(kg_rules_path)
 
-    all_rules = [item.strip() for sublist in rules_dict.values() for item in sublist]
+    all_rules = [item.strip() for sublist in rules_dict.values()
+                 for item in sublist]
     all_rules_set = set(all_rules)
 
     with open(os.path.join(confidence_folder, 'statistic.txt'), 'w') as fout_state:
@@ -578,19 +601,24 @@ def load_data_and_paths(args):
     data_path = os.path.join(args.data_path, args.dataset) + "/"
     dataset = Dataset(data_root=data_path, inv=True)
 
-    sampled_path_with_valid_dir = os.path.join(args.sampled_paths, args.dataset + '_valid')
+    sampled_path_with_valid_dir = os.path.join(
+        args.sampled_paths, args.dataset + '_valid')
     sampled_path_dir = os.path.join(args.sampled_paths, args.dataset)
-    sampled_path = read_paths(os.path.join(sampled_path_dir, "closed_rel_paths.jsonl"))
+    sampled_path = read_paths(os.path.join(
+        sampled_path_dir, "closed_rel_paths.jsonl"))
 
     prompt_path = os.path.join(args.prompt_paths, 'common.json')
     prompt_path_for_zero = os.path.join(args.prompt_paths, 'zero.json')
+    prompt_path_for_low = os.path.join(args.prompt_paths, 'low.json')
+    prompt_path_for_high = os.path.join(args.prompt_paths, 'high.json')
 
-    return dataset, sampled_path, sampled_path_with_valid_dir, sampled_path_dir, prompt_path, prompt_path_for_zero
+    return dataset, sampled_path, sampled_path_with_valid_dir, sampled_path_dir, prompt_path, prompt_path_for_zero, prompt_path_for_low, prompt_path_for_high
 
 
 def prepare_rule_heads(dataset, sampled_path):
     rule_head_without_zero = {rule['head'] for rule in sampled_path}
-    rule_head_with_zero = set(dataset.rdict.rel2idx.keys()) - rule_head_without_zero
+    rule_head_with_zero = set(
+        dataset.rdict.rel2idx.keys()) - rule_head_without_zero
     return rule_head_without_zero, rule_head_with_zero
 
 
@@ -607,10 +635,13 @@ def load_configuration(dataset, sampled_path_dir, args):
 
     rdict = dataset.get_relation_dict()
     similarity_matrix = np.load(os.path.join(sampled_path_dir, "matrix.npy"))
-    transformers_id2rel = load_json_data(os.path.join(sampled_path_dir, "transfomers_id2rel.json"))
-    transformers_rel2id = load_json_data(os.path.join(sampled_path_dir, "transfomers_rel2id.json"))
+    transformers_id2rel = load_json_data(os.path.join(
+        sampled_path_dir, "transfomers_id2rel.json"))
+    transformers_rel2id = load_json_data(os.path.join(
+        sampled_path_dir, "transfomers_rel2id.json"))
 
-    similar_rel_dict = get_topk_similiary_rel(args.topk, similarity_matrix, transformers_id2rel, transformers_rel2id)
+    similar_rel_dict = get_topk_similiary_rel(
+        args.topk, similarity_matrix, transformers_id2rel, transformers_rel2id)
 
     return rdict, relation_regex, similar_rel_dict
 
@@ -635,14 +666,19 @@ def create_directories(args):
 
 
 def main(args, LLM):
-    dataset, sampled_path, sampled_path_with_valid_dir, sampled_path_dir, prompt_path, prompt_path_for_zero = load_data_and_paths(args)
-    rule_head_without_zero, rule_head_with_zero = prepare_rule_heads(dataset, sampled_path)
+    dataset, sampled_path, sampled_path_with_valid_dir, sampled_path_dir, prompt_path, prompt_path_for_zero, prompt_path_for_low, prompt_path_for_high = load_data_and_paths(
+        args)
+    rule_head_without_zero, rule_head_with_zero = prepare_rule_heads(
+        dataset, sampled_path)
     kg_rules_path = determine_kg_rules_path(args, sampled_path_dir)
-    rdict, relation_regex, similar_rel_dict = load_configuration(dataset, sampled_path_dir, args)
+    rdict, relation_regex, similar_rel_dict = load_configuration(
+        dataset, sampled_path_dir, args)
     rule_path, filter_rule_path = create_directories(args)
 
     prompt_info_dict = load_json_data(prompt_path)
     prompt_info_zero_dict = load_json_data(prompt_path_for_zero)
+    prompt_dict_for_low = load_json_data(prompt_path_for_low)
+    prompt_dict_for_high = load_json_data(prompt_path_for_high)
 
     model = LLM(args)
     print("Preparing pipeline for inference...")
@@ -650,11 +686,12 @@ def main(args, LLM):
 
     llm_rule_generate(
         args, filter_rule_path, kg_rules_path, model, rdict, relation_regex, rule_path,
-        sampled_path, similar_rel_dict, sampled_path_with_valid_dir, rule_head_with_zero, prompt_info_dict, prompt_info_zero_dict
+        sampled_path, similar_rel_dict, sampled_path_with_valid_dir, rule_head_with_zero, prompt_info_dict, prompt_info_zero_dict, prompt_dict_for_low, prompt_dict_for_high
     )
 
+
 def llm_rule_generate(args, filter_rule_path, kg_rules_path, model, rdict, relation_regex, rule_path,
-                      sampled_path, similiary_rel_dict, sampled_path_with_valid_dir, rule_head_with_zero, prompt_info_dict, prompt_info_zero_dict):
+                      sampled_path, similiary_rel_dict, sampled_path_with_valid_dir, rule_head_with_zero, prompt_info_dict, prompt_info_zero_dict, prompt_dict_for_low, prompt_dict_for_high):
     # Generate rules
     with ThreadPool(args.n) as p:
         for _ in tqdm(
@@ -703,10 +740,11 @@ def llm_rule_generate(args, filter_rule_path, kg_rules_path, model, rdict, relat
             else:
                 print(f"Error:{filename}")
 
-    #valid dataset中的rule
-    kg_rules_path_with_valid = os.path.join(sampled_path_with_valid_dir, "rules_name.json")
+    # valid dataset中的rule
+    kg_rules_path_with_valid = os.path.join(
+        sampled_path_with_valid_dir, "rules_name.json")
 
-    #分析LLM第一次生成规则的情况
+    # 分析LLM第一次生成规则的情况
     statistics_dir = os.path.join(
         args.rule_path,
         args.dataset,
@@ -726,7 +764,8 @@ def llm_rule_generate(args, filter_rule_path, kg_rules_path, model, rdict, relat
     if args.is_rel_name is True:
         copy_files(rule_path, filter_rule_path, 'txt')
     else:
-        process_rules_files(rule_path, filter_rule_path, rdict, relation_regex, error_file_path)
+        process_rules_files(rule_path, filter_rule_path,
+                            rdict, relation_regex, error_file_path)
 
     model.gen_rule_statistic(rule_path, statistics_file_path)
 
@@ -736,58 +775,67 @@ def llm_rule_generate(args, filter_rule_path, kg_rules_path, model, rdict, relat
     else:
         clear_folder(output_clean_folder)
 
-    output_filter_train_folder = os.path.join(args.rule_path, args.dataset, 'filter', 'train')
+    output_filter_train_folder = os.path.join(
+        args.rule_path, args.dataset, 'filter', 'train')
     if not os.path.exists(output_filter_train_folder):
         os.makedirs(output_filter_train_folder)
     else:
         clear_folder(output_filter_train_folder)
 
-    #filter文件夹保存历次迭代生成的rule，包括high conf和low conf文件
-    output_filter_eva_folder = os.path.join(args.rule_path, args.dataset, 'filter', 'eva')
+    # filter文件夹保存历次迭代生成的rule，包括high conf和low conf文件
+    output_filter_eva_folder = os.path.join(
+        args.rule_path, args.dataset, 'filter', 'eva')
     if not os.path.exists(output_filter_eva_folder):
         os.makedirs(output_filter_eva_folder)
     else:
         clear_folder(output_filter_eva_folder)
 
-    output_filter_train_eva_folder = os.path.join(args.rule_path, args.dataset, 'filter', 'train_eva')
+    output_filter_train_eva_folder = os.path.join(
+        args.rule_path, args.dataset, 'filter', 'train_eva')
     if not os.path.exists(output_filter_train_eva_folder):
         os.makedirs(output_filter_train_eva_folder)
     else:
         clear_folder(output_filter_train_eva_folder)
 
     # evaluation文件夹记录每次迭代时，中间生成的confidence.json
-    output_eva_train_folder = os.path.join(args.rule_path, args.dataset, 'evaluation', 'train')
+    output_eva_train_folder = os.path.join(
+        args.rule_path, args.dataset, 'evaluation', 'train')
     if not os.path.exists(output_eva_train_folder):
         os.makedirs(output_eva_train_folder)
     else:
         clear_folder(output_eva_train_folder)
 
-    output_eva_eva_folder = os.path.join(args.rule_path, args.dataset, 'evaluation', 'eva')
+    output_eva_eva_folder = os.path.join(
+        args.rule_path, args.dataset, 'evaluation', 'eva')
     if not os.path.exists(output_eva_eva_folder):
         os.makedirs(output_eva_eva_folder)
     else:
         clear_folder(output_eva_eva_folder)
 
-    output_eva_train_eva_folder = os.path.join(args.rule_path, args.dataset, 'evaluation', 'train_eva')
+    output_eva_train_eva_folder = os.path.join(
+        args.rule_path, args.dataset, 'evaluation', 'train_eva')
     if not os.path.exists(output_eva_train_eva_folder):
         os.makedirs(output_eva_train_eva_folder)
     else:
         clear_folder(output_eva_train_eva_folder)
 
-    #临时文件夹，保存关于LLM的request和response
-    iteration_rule_file_path = os.path.join(args.rule_path, args.dataset, 'iteration')
+    # 临时文件夹，保存关于LLM的request和response
+    iteration_rule_file_path = os.path.join(
+        args.rule_path, args.dataset, 'iteration')
     if not os.path.exists(iteration_rule_file_path):
         os.makedirs(iteration_rule_file_path)
     else:
         clear_folder(iteration_rule_file_path)
 
-    #保存每次迭代时，LLM的response
+    # 保存每次迭代时，LLM的response
     for i in range(args.num_iter + 1):
-        temp_only_txt_file_path = os.path.join(args.rule_path, args.dataset, f'only_txt_{i}')
+        temp_only_txt_file_path = os.path.join(
+            args.rule_path, args.dataset, f'only_txt_{i}')
         clear_folder(temp_only_txt_file_path)
 
-    #临时文件夹，保存关于LLM的response
-    iteration_only_txt_file_path = os.path.join(args.rule_path, args.dataset, 'only_txt')
+    # 临时文件夹，保存关于LLM的response
+    iteration_only_txt_file_path = os.path.join(
+        args.rule_path, args.dataset, 'only_txt')
     if not os.path.exists(iteration_only_txt_file_path):
         os.makedirs(iteration_only_txt_file_path)
     else:
@@ -796,25 +844,33 @@ def llm_rule_generate(args, filter_rule_path, kg_rules_path, model, rdict, relat
     copy_folder_contents(filter_rule_path, iteration_only_txt_file_path)
 
     for i in range(args.num_iter):
-        temp_only_txt_file_path = os.path.join(args.rule_path, args.dataset, f'only_txt_{i}')
-        copy_folder_contents(iteration_only_txt_file_path, temp_only_txt_file_path)
+        temp_only_txt_file_path = os.path.join(
+            args.rule_path, args.dataset, f'only_txt_{i}')
+        copy_folder_contents(iteration_only_txt_file_path,
+                             temp_only_txt_file_path)
 
         start_time = time.time()
 
-        output_rules_folder_dir = clean(args, model, iteration_only_txt_file_path, output_clean_folder)
+        output_rules_folder_dir = clean(
+            args, model, iteration_only_txt_file_path, output_clean_folder)
         conf_folder = None
         if args.bgkg == 'train':
-            train_rule_set = evaluation(args, output_rules_folder_dir, output_eva_train_folder, 'train', index=i)
-            filter_rules_based_confidence(train_rule_set, args.min_conf, output_filter_train_folder, i)
+            train_rule_set = evaluation(
+                args, output_rules_folder_dir, output_eva_train_folder, 'train', index=i)
+            filter_rules_based_confidence(
+                train_rule_set, args.min_conf, output_filter_train_folder, i)
             conf_folder = output_filter_train_folder
         elif args.bgkg == 'valid':
-            env_rule_set = evaluation(args, output_rules_folder_dir, output_eva_eva_folder, 'eva', index=i)
-            filter_rules_based_confidence(env_rule_set, args.min_conf, output_filter_eva_folder, i)
+            env_rule_set = evaluation(
+                args, output_rules_folder_dir, output_eva_eva_folder, 'eva', index=i)
+            filter_rules_based_confidence(
+                env_rule_set, args.min_conf, output_filter_eva_folder, i)
             conf_folder = output_filter_eva_folder
         elif args.bgkg == 'train_valid':
             train_env_rule_set = evaluation(args, output_rules_folder_dir, output_eva_train_eva_folder, 'train_eva',
                                             index=i)
-            filter_rules_based_confidence(train_env_rule_set, args.min_conf, output_filter_train_eva_folder, i)
+            filter_rules_based_confidence(
+                train_env_rule_set, args.min_conf, output_filter_train_eva_folder, i)
             conf_folder = output_filter_train_eva_folder
 
         end_time = time.time()
@@ -824,55 +880,69 @@ def llm_rule_generate(args, filter_rule_path, kg_rules_path, model, rdict, relat
         print(f"程序运行时间：{elapsed_minutes}分钟")
 
         if args.is_high is False:
-           conf = get_low_conf(os.path.join(conf_folder, 'temp_low_conf.txt'), relation_regex, rdict)
+            conf = get_low_conf(os.path.join(
+                conf_folder, 'temp_low_conf.txt'), relation_regex, rdict)
         else:
-           conf = get_high_conf(os.path.join(conf_folder, 'temp_hight_conf.txt'), relation_regex, rdict)
+            conf = get_high_conf(os.path.join(
+                conf_folder, 'temp_hight_conf.txt'), relation_regex, rdict)
 
         clear_folder(iteration_only_txt_file_path)
         clear_folder(iteration_rule_file_path)
         gen_rules_iteration(args, kg_rules_path, model, rdict, relation_regex,
                             iteration_rule_file_path,
-                            conf, similiary_rel_dict, kg_rules_path_with_valid)
-        copy_files(iteration_rule_file_path, iteration_only_txt_file_path, 'txt')
+                            conf, similiary_rel_dict, kg_rules_path_with_valid, prompt_dict_for_low, prompt_dict_for_high)
+        copy_files(iteration_rule_file_path,
+                   iteration_only_txt_file_path, 'txt')
 
-    temp_only_txt_file_path = os.path.join(args.rule_path, args.dataset, f'only_txt_{args.num_iter}')
+    temp_only_txt_file_path = os.path.join(
+        args.rule_path, args.dataset, f'only_txt_{args.num_iter}')
     copy_folder_contents(iteration_only_txt_file_path, temp_only_txt_file_path)
 
-    output_rules_folder_dir = clean(args, model, iteration_only_txt_file_path, output_clean_folder)
+    output_rules_folder_dir = clean(
+        args, model, iteration_only_txt_file_path, output_clean_folder)
 
     source_rule_path = None
     if args.bgkg == 'train':
-        train_rule_set = evaluation(args, output_rules_folder_dir, output_eva_train_folder, 'train', index=args.num_iter)
-        filter_rules_based_confidence(train_rule_set, args.min_conf, output_filter_train_folder, args.num_iter)
+        train_rule_set = evaluation(
+            args, output_rules_folder_dir, output_eva_train_folder, 'train', index=args.num_iter)
+        filter_rules_based_confidence(
+            train_rule_set, args.min_conf, output_filter_train_folder, args.num_iter)
         analysis_data(output_filter_train_folder, kg_rules_path)
         source_rule_path = output_filter_train_folder
     elif args.bgkg == 'valid':
-        env_rule_set = evaluation(args, output_rules_folder_dir, output_eva_eva_folder, 'eva', index=args.num_iter)
-        filter_rules_based_confidence(env_rule_set, args.min_conf, output_filter_eva_folder, args.num_iter)
+        env_rule_set = evaluation(
+            args, output_rules_folder_dir, output_eva_eva_folder, 'eva', index=args.num_iter)
+        filter_rules_based_confidence(
+            env_rule_set, args.min_conf, output_filter_eva_folder, args.num_iter)
         analysis_data(output_filter_eva_folder, kg_rules_path)
         source_rule_path = output_filter_eva_folder
     elif args.bgkg == 'train_valid':
         train_env_rule_set = evaluation(args, output_rules_folder_dir, output_eva_train_eva_folder, 'train_eva',
                                         index=args.num_iter)
-        filter_rules_based_confidence(train_env_rule_set, args.min_conf, output_filter_train_eva_folder, args.num_iter)
+        filter_rules_based_confidence(
+            train_env_rule_set, args.min_conf, output_filter_train_eva_folder, args.num_iter)
         analysis_data(output_filter_train_eva_folder, kg_rules_path)
         source_rule_path = output_filter_train_eva_folder
 
-    final_sumary_file_path = os.path.join('gen_rules_iteration', args.dataset, 'final_summary')
+    final_sumary_file_path = os.path.join(
+        'gen_rules_iteration', args.dataset, 'final_summary')
     os.makedirs(final_sumary_file_path, exist_ok=True)
     if args.rule_domain == 'high':
-        high_train_eva_file_path = os.path.join(source_rule_path, 'hight_conf.txt')
+        high_train_eva_file_path = os.path.join(
+            source_rule_path, 'hight_conf.txt')
         with open(high_train_eva_file_path, 'r') as fin_high:
             high_unique_strings = set(fin_high.read().split())
 
         unique_strings = high_unique_strings
 
     elif args.rule_domain == 'iteration':
-        high_train_eva_file_path = os.path.join(source_rule_path, 'hight_conf.txt')
+        high_train_eva_file_path = os.path.join(
+            source_rule_path, 'hight_conf.txt')
         with open(high_train_eva_file_path, 'r') as fin_high:
             high_unique_strings = set(fin_high.read().split())
 
-        low_train_eva_file_path = os.path.join(source_rule_path, 'low_conf.txt')
+        low_train_eva_file_path = os.path.join(
+            source_rule_path, 'low_conf.txt')
         with open(low_train_eva_file_path, 'r') as fin_low:
             low_unique_strings = set(fin_low.read().split())
 
@@ -885,8 +955,9 @@ def llm_rule_generate(args, filter_rule_path, kg_rules_path, model, rdict, relat
         for rule in unique_strings:
             fout_final.write(f'{rule}\n')
 
+
 def gen_rules_iteration(args, kg_rules_path, model, rdict, relation_regex, rule_path, conf,
-                        similiary_rel_dict, kg_rules_path_with_valid):
+                        similiary_rel_dict, kg_rules_path_with_valid, prompt_dict_for_low, prompt_dict_for_high):
     with ThreadPool(args.n) as p:
         for _ in tqdm(
                 p.imap_unordered(
@@ -899,7 +970,9 @@ def gen_rules_iteration(args, kg_rules_path, model, rdict, relation_regex, rule_
                         args=args,
                         relation_regex=relation_regex,
                         similiary_rel_dict=similiary_rel_dict,
-                        kg_rules_path_with_valid = kg_rules_path_with_valid
+                        kg_rules_path_with_valid=kg_rules_path_with_valid,
+                        prompt_dict_for_low=prompt_dict_for_low, prompt_dict_for_high=prompt_dict_for_high
+
                     ),
                     conf,
                 ),
@@ -907,34 +980,34 @@ def gen_rules_iteration(args, kg_rules_path, model, rdict, relation_regex, rule_
         ):
             pass
 
-def gen_rules_for_unknown_relation(args, kg_rules_path, model, rdict, relation_regex, relation_subgraph, rule_path, low_conf,
-                        similiary_rel_dict):
-    with ThreadPool(args.n) as p:
-        for _ in tqdm(
-                p.imap_unordered(
-                    partial(
-                        generate_rule_for_unknown_relation_by_multi_thread,
-                        rdict=rdict,
-                        rule_path=rule_path,
-                        kg_rules_path=kg_rules_path,
-                        model=model,
-                        args=args,
-                        relation_subgraph=relation_subgraph,
-                        relation_regex=relation_regex,
-                        similiary_rel_dict=similiary_rel_dict
-                    ),
-                    low_conf,
-                ),
-                total=len(low_conf),
-        ):
-            pass
+# def gen_rules_for_unknown_relation(args, kg_rules_path, model, rdict, relation_regex, relation_subgraph, rule_path, low_conf,
+#                         similiary_rel_dict):
+#     with ThreadPool(args.n) as p:
+#         for _ in tqdm(
+#                 p.imap_unordered(
+#                     partial(
+#                         generate_rule_for_unknown_relation_by_multi_thread,
+#                         rdict=rdict,
+#                         rule_path=rule_path,
+#                         kg_rules_path=kg_rules_path,
+#                         model=model,
+#                         args=args,
+#                         relation_subgraph=relation_subgraph,
+#                         relation_regex=relation_regex,
+#                         similiary_rel_dict=similiary_rel_dict
+#                     ),
+#                     low_conf,
+#                 ),
+#                 total=len(low_conf),
+#         ):
+#             pass
 
 
 def filter_rules_based_confidence(rule_set, min_conf, output_folder, index):
     with open(os.path.join(output_folder, 'hight_conf.txt'), 'a') as fout_hight, open(
-            os.path.join(output_folder, 'low_conf.txt'), 'a') as fout_low, open(
-        os.path.join(output_folder, 'temp_hight_conf.txt'), 'w') as fout_temp_hight, open(
-        os.path.join(output_folder, 'temp_low_conf.txt'), 'w') as fout_temp_low:
+        os.path.join(output_folder, 'low_conf.txt'), 'a') as fout_low, open(
+            os.path.join(output_folder, 'temp_hight_conf.txt'), 'w') as fout_temp_hight, open(
+            os.path.join(output_folder, 'temp_low_conf.txt'), 'w') as fout_temp_low:
         fout_hight.write(f"index:{index}\n")
         fout_low.write(f"index:{index}\n")
         for rule in rule_set:
@@ -964,12 +1037,14 @@ def evaluation(args, output_rules_folder_dir, output_evaluation_folder, dataset_
         temporal_walk = Temporal_Walk(np.array(data.valid_idx.tolist() + data.train_idx.tolist()), data.inv_relation_id,
                                       args.transition_distr)
 
-    rl = Rule_Learner(temporal_walk.edges, data.id2relation, data.inv_relation_id, args.dataset)
+    rl = Rule_Learner(temporal_walk.edges, data.id2relation,
+                      data.inv_relation_id, args.dataset)
     rule_path = output_rules_folder_dir
     constant_config = load_json_data('./Config/constant.json')
     relation_regex = constant_config['relation_regex'][args.dataset]
 
-    rules_var_path = os.path.join("sampled_path", args.dataset, "original", "rules_var.json")
+    rules_var_path = os.path.join(
+        "sampled_path", args.dataset, "original", "rules_var.json")
     rules_var_dict = load_json_data(rules_var_path)
 
     if args.is_only_with_original_rules:
@@ -984,13 +1059,14 @@ def evaluation(args, output_rules_folder_dir, output_evaluation_folder, dataset_
                 rl.num_original += 1
     else:
         llm_gen_rules_list, fail_calc_confidence = calculate_confidence(rule_path, data.relation2id, data.inv_relation_id, rl, relation_regex,
-                                                  rules_var_dict, is_merge, is_has_confidence=False)
+                                                                        rules_var_dict, is_merge, is_has_confidence=False)
 
     rules_statistics(rl.rules_dict)
 
     if args.is_only_with_original_rules:
         dir_path = output_evaluation_folder
-        confidence_file_path = os.path.join(dir_path, 'original_confidence.json')
+        confidence_file_path = os.path.join(
+            dir_path, 'original_confidence.json')
         save_json_data(rl.rules_dict, confidence_file_path)
     else:
         if is_merge is True:
@@ -1003,14 +1079,17 @@ def evaluation(args, output_rules_folder_dir, output_evaluation_folder, dataset_
             rules_statistics(rl.rules_dict)
 
             dir_path = output_evaluation_folder
-            confidence_file_path = os.path.join(dir_path, 'merge_confidence.json')
+            confidence_file_path = os.path.join(
+                dir_path, 'merge_confidence.json')
             save_json_data(rl.rules_dict, confidence_file_path)
         else:
             dir_path = output_evaluation_folder
-            confidence_file_path = os.path.join(dir_path, f'{index}_confidence.json')
+            confidence_file_path = os.path.join(
+                dir_path, f'{index}_confidence.json')
             save_json_data(rl.rules_dict, confidence_file_path)
 
-            fail_confidence_file_path = os.path.join(dir_path, 'fail_confidence.txt')
+            fail_confidence_file_path = os.path.join(
+                dir_path, 'fail_confidence.txt')
             with open(fail_confidence_file_path, 'a') as fout:
                 for fail_rule in fail_calc_confidence:
                     fout.write(f'{fail_rule}\n')
@@ -1033,13 +1112,15 @@ def calculate_confidence(rule_path, relation2id, inv_relation_id, rl, relation_r
                             temp_rule = rule.split('&')[:-1]
                             rule_without_confidence = '&'.join(temp_rule)
                             rule_without_confidence = rule_without_confidence.strip()
-                            walk = get_walk(rule_without_confidence, relation2id, inv_relation_id, relation_regex)
+                            walk = get_walk(
+                                rule_without_confidence, relation2id, inv_relation_id, relation_regex)
 
                             rule_with_confidence = rl.create_rule_for_merge_for_iteration(walk, confidence,
-                                                                                              rule_without_confidence,
-                                                                                              rules_var_dict,
-                                                                                              is_merge)
-                            llm_gen_rules_list.append(rule_with_confidence + "\n")
+                                                                                          rule_without_confidence,
+                                                                                          rules_var_dict,
+                                                                                          is_merge)
+                            llm_gen_rules_list.append(
+                                rule_with_confidence + "\n")
                         except Exception as e:
                             print(e)
                             fail_calc_confidence.append(rule + "\n")
@@ -1049,17 +1130,17 @@ def calculate_confidence(rule_path, relation2id, inv_relation_id, rl, relation_r
                             temp_rule = rule.split('&')
                             rule_without_confidence = '&'.join(temp_rule)
                             rule_without_confidence = rule_without_confidence.strip()
-                            walk = get_walk(rule_without_confidence, relation2id, inv_relation_id, relation_regex)
+                            walk = get_walk(
+                                rule_without_confidence, relation2id, inv_relation_id, relation_regex)
                             rule_with_confidence = rl.create_rule_for_merge_for_iteration(walk, confidence,
                                                                                           rule_without_confidence,
                                                                                           rules_var_dict,
                                                                                           is_merge)
-                            llm_gen_rules_list.append(rule_with_confidence + "\n")
+                            llm_gen_rules_list.append(
+                                rule_with_confidence + "\n")
                         except Exception as e:
                             print(e)
                             fail_calc_confidence.append(rule + "\n")
-
-
 
                 except Exception as e:
                     print(f"Error processing rule: {rule}")
@@ -1074,7 +1155,8 @@ def process_rule(rule, relation2id, inv_relation_id, rl, relation_regex, rules_v
             confidence = float(rule.split('&')[-1].strip())
             temp_rule = rule.split('&')[:-1]
             rule_without_confidence = '&'.join(temp_rule).strip()
-            walk = get_walk(rule_without_confidence, relation2id, inv_relation_id, relation_regex)
+            walk = get_walk(rule_without_confidence, relation2id,
+                            inv_relation_id, relation_regex)
             rule_with_confidence = rl.create_rule_for_merge_for_iteration(walk, confidence,
                                                                           rule_without_confidence,
                                                                           rules_var_dict, is_merge)
@@ -1083,7 +1165,8 @@ def process_rule(rule, relation2id, inv_relation_id, rl, relation_regex, rules_v
             confidence = 0
             temp_rule = rule.split('&')
             rule_without_confidence = '&'.join(temp_rule).strip()
-            walk = get_walk(rule_without_confidence, relation2id, inv_relation_id, relation_regex)
+            walk = get_walk(rule_without_confidence, relation2id,
+                            inv_relation_id, relation_regex)
             rule_with_confidence = rl.create_rule_for_merge_for_iteration(walk, confidence,
                                                                           rule_without_confidence,
                                                                           rules_var_dict, is_merge)
@@ -1091,8 +1174,9 @@ def process_rule(rule, relation2id, inv_relation_id, rl, relation_regex, rules_v
     except Exception as e:
         return None, rule + "\n"
 
+
 def calculate_confidence_O(rule_path, relation2id, inv_relation_id, rl, relation_regex, rules_var_dict, is_merge,
-                         is_has_confidence=False):
+                           is_has_confidence=False):
     llm_gen_rules_list = []
     fail_calc_confidence = []
 
@@ -1115,8 +1199,9 @@ def calculate_confidence_O(rule_path, relation2id, inv_relation_id, rl, relation
 
     return llm_gen_rules_list, fail_calc_confidence
 
+
 def calculate_confidence_1(rule_path, relation2id, inv_relation_id, rl, relation_regex, rules_var_dict, is_merge,
-                         is_has_confidence=False, num_threads=10):
+                           is_has_confidence=False, num_threads=10):
     llm_gen_rules_list = []
     fail_calc_confidence = []
 
@@ -1142,7 +1227,6 @@ def calculate_confidence_1(rule_path, relation2id, inv_relation_id, rl, relation
     return llm_gen_rules_list, fail_calc_confidence
 
 
-
 def get_walk(rule, relation2id, inv_relation_id, regex):
     head_body = rule.split('<-')
     rule_head_full_name = head_body[0].strip()
@@ -1153,18 +1237,21 @@ def get_walk(rule, relation2id, inv_relation_id, regex):
 
     # 提取规则头的关系、主语和宾语
     match = re.search(relation_regex, rule_head_full_name)
-    head_relation_name, head_subject, head_object, head_timestamp = match.groups()[:4]
+    head_relation_name, head_subject, head_object, head_timestamp = match.groups()[
+        :4]
 
     # 提取规则体的关系和实体
     matches = re.findall(relation_regex, condition_string)
     entities = [head_object] + [match[1].strip() for match in matches[:-1]] + [matches[-1][1].strip(),
                                                                                matches[-1][2].strip()]
 
-    relation_ids = [relation2id[head_relation_name]] + [relation2id[match[0].strip()] for match in matches]
+    relation_ids = [relation2id[head_relation_name]] + \
+        [relation2id[match[0].strip()] for match in matches]
 
     # 反转除第一个元素外的列表
     entities = entities[:1] + entities[1:][::-1]
-    relation_ids = relation_ids[:1] + [inv_relation_id[x] for x in relation_ids[:0:-1]]
+    relation_ids = relation_ids[:1] + [inv_relation_id[x]
+                                       for x in relation_ids[:0:-1]]
 
     # 构造结果字典
     result = {
@@ -1174,6 +1261,7 @@ def get_walk(rule, relation2id, inv_relation_id, regex):
 
     return result
 
+
 def clean(args, llm_model, filter_rule_path, output_folder):
     data_path = os.path.join(args.data_path, args.dataset) + '/'
     dataset = Dataset(data_root=data_path, inv=True)
@@ -1181,7 +1269,8 @@ def clean(args, llm_model, filter_rule_path, output_folder):
     all_rels = list(rdict.rel2idx.keys())
     input_folder = filter_rule_path
 
-    output_statistic_folder_dir = os.path.join(output_folder, 'clean_statistics')
+    output_statistic_folder_dir = os.path.join(
+        output_folder, 'clean_statistics')
     if not os.path.exists(output_statistic_folder_dir):
         os.makedirs(output_statistic_folder_dir)
 
@@ -1191,8 +1280,9 @@ def clean(args, llm_model, filter_rule_path, output_folder):
     else:
         clear_folder(output_rules_folder_dir)
 
-    #分析clean过程中success与error的情况
-    output_error_file_path = os.path.join(output_statistic_folder_dir, 'error.txt')
+    # 分析clean过程中success与error的情况
+    output_error_file_path = os.path.join(
+        output_statistic_folder_dir, 'error.txt')
     output_suc_file_path = os.path.join(output_statistic_folder_dir, 'suc.txt')
     with open(output_error_file_path, 'a') as fout_error, open(output_suc_file_path, 'a') as fout_suc:
         num_error, num_suc = clean_processing(all_rels, args, fout_error, input_folder, llm_model,
@@ -1215,7 +1305,8 @@ def clean_processing(all_rels, args, fout_error, input_folder, llm_model, output
         if filename.endswith(".txt") and "query" not in filename and filename.startswith("fail") is False:
             input_filepath = os.path.join(input_folder, filename)
             name, ext = os.path.splitext(filename)
-            summarized_filepath = os.path.join(output_folder, f"{name}_summarized_rules.txt")
+            summarized_filepath = os.path.join(
+                output_folder, f"{name}_summarized_rules.txt")
             clean_filename = name + '_cleaned_rules.txt'
             clean_filepath = os.path.join(output_folder, clean_filename)
 
@@ -1223,14 +1314,16 @@ def clean_processing(all_rels, args, fout_error, input_folder, llm_model, output
                 # Step 1: Summarize rules from the input file
                 print("Start summarize: ", filename)
                 # Summarize rules
-                summarized_rules = summarize_rule(input_filepath, llm_model, args, rule_start_with_regex, replace_regex)
+                summarized_rules = summarize_rule(
+                    input_filepath, llm_model, args, rule_start_with_regex, replace_regex)
                 print("write file", summarized_filepath)
                 with open(summarized_filepath, "w") as f:
                     f.write('\n'.join(summarized_rules))
 
             # Step 2: Clean summarized rules and keep format
             print(f"Clean file {summarized_filepath} with keeping the format")
-            cleaned_rules, num, num_0 = clean_rules(summarized_filepath, all_rels, relation_regex, fout_error, fout_suc)
+            cleaned_rules, num, num_0 = clean_rules(
+                summarized_filepath, all_rels, relation_regex, fout_error, fout_suc)
             num_error = num_error + num
             num_suc = num_suc + num_0
 
@@ -1243,10 +1336,12 @@ def clean_processing(all_rels, args, fout_error, input_folder, llm_model, output
 def extract_rules(content_list, rule_start_with_regex, replace_regex):
     """ Extract the rules in the content without any explanation and the leading number if it has."""
     rule_pattern = re.compile(rule_start_with_regex)
-    extracted_rules = [s.strip() for s in content_list if rule_pattern.match(s)]
+    extracted_rules = [s.strip()
+                       for s in content_list if rule_pattern.match(s)]
     number_pattern = re.compile(replace_regex)
     cleaned_rules = [number_pattern.sub('', s) for s in extracted_rules]
-    return list(set(cleaned_rules))  # Remove duplicates by converting to set and back to list
+    # Remove duplicates by converting to set and back to list
+    return list(set(cleaned_rules))
 
 
 def summarize_rules_prompt(relname, k):
@@ -1263,6 +1358,7 @@ def summarize_rules_prompt(relname, k):
               'Return the rules only without any explanations. '
     return prompt
 
+
 def summarize_rule_for_unkown(file, llm_model, args, rule_start_with_regex, replace_regex):
     """
     Summarize the rules
@@ -1278,8 +1374,10 @@ def summarize_rule_for_unkown(file, llm_model, args, rule_start_with_regex, repl
         return rule_list
     else:  # Do summarization and correct the spelling error
         summarize_prompt = summarize_rules_prompt(rel_name, args.k)
-        summarize_prompt_len = num_tokens_from_message(summarize_prompt, args.model_name)
-        list_of_rule_lists = shuffle_split_path_list(rule_list, summarize_prompt_len, args.model_name)
+        summarize_prompt_len = num_tokens_from_message(
+            summarize_prompt, args.model_name)
+        list_of_rule_lists = shuffle_split_path_list(
+            rule_list, summarize_prompt_len, args.model_name)
         response_list = []
         for rule_list in list_of_rule_lists:
             message = '\n'.join(rule_list) + summarize_prompt
@@ -1290,6 +1388,7 @@ def summarize_rule_for_unkown(file, llm_model, args, rule_start_with_regex, repl
                                        replace_regex)  # Extract rules and remove any explanations from summarized response
 
         return response_rules
+
 
 def summarize_rule(file, llm_model, args, rule_start_with_regex, replace_regex):
     """
@@ -1306,8 +1405,10 @@ def summarize_rule(file, llm_model, args, rule_start_with_regex, replace_regex):
         return rule_list
     else:  # Do summarization and correct the spelling error
         summarize_prompt = summarize_rules_prompt(rel_name, args.k)
-        summarize_prompt_len = num_tokens_from_message(summarize_prompt, args.model_name)
-        list_of_rule_lists = shuffle_split_path_list(rule_list, summarize_prompt_len, args.model_name)
+        summarize_prompt_len = num_tokens_from_message(
+            summarize_prompt, args.model_name)
+        list_of_rule_lists = shuffle_split_path_list(
+            rule_list, summarize_prompt_len, args.model_name)
         response_list = []
         for rule_list in list_of_rule_lists:
             message = '\n'.join(rule_list) + summarize_prompt
@@ -1329,7 +1430,6 @@ def modify_process(temp_rule, relation_regex):
             subject = match[2].strip()
             object = match[3].strip()
             timestamp = match[4].strip()
-
 
 
 def clean_rules_for_unknown(summarized_file_path, all_rels, relation_regex, fout_error, fout_suc):
@@ -1364,21 +1464,26 @@ def clean_rules_for_unknown(summarized_file_path, all_rels, relation_regex, fout
                     timestamp = match[4].strip()
 
                     if timestamp[1:].isdigit() is False:
-                        correct_rule = modify_process(temp_rule, relation_regex)
+                        correct_rule = modify_process(
+                            temp_rule, relation_regex)
                         is_check = False
                         break
 
                     if relation_name not in all_rels:
-                        best_match = get_close_matches(relation_name, all_rels, n=1)
+                        best_match = get_close_matches(
+                            relation_name, all_rels, n=1)
                         if not best_match:
-                            print(f"Cannot correctify this rule, head not in relation:{input_rule}\n")
-                            fout_error.write(f"Cannot correctify this rule, head not in relation:{input_rule}\n")
+                            print(
+                                f"Cannot correctify this rule, head not in relation:{input_rule}\n")
+                            fout_error.write(
+                                f"Cannot correctify this rule, head not in relation:{input_rule}\n")
                             is_save = False
                             num_error = num_error + 1
                             break
                         relation_name = best_match[0].strip()
 
-                    rule_list.append(f'{relation_name}({subject},{object},{timestamp})')
+                    rule_list.append(
+                        f'{relation_name}({subject},{object},{timestamp})')
 
                     if idx == 0:
                         head_subject = subject
@@ -1393,7 +1498,8 @@ def clean_rules_for_unknown(summarized_file_path, all_rels, relation_regex, fout
                         if last_subject == subject:
                             last_subject = object
                         else:
-                            print(f"Error: Rule {input_rule} does not conform to the definition of chain rule.")
+                            print(
+                                f"Error: Rule {input_rule} does not conform to the definition of chain rule.")
                             fout_error.write(
                                 f"Error: Rule {input_rule} does not conform to the definition of chain rule.\n")
                             num_error = num_error + 1
@@ -1404,7 +1510,8 @@ def clean_rules_for_unknown(summarized_file_path, all_rels, relation_regex, fout
 
                     if idx == len(regrex_list) - 1:
                         if last_subject != final_object:
-                            print(f"Error: Rule {input_rule} does not conform to the definition of chain rule.")
+                            print(
+                                f"Error: Rule {input_rule} does not conform to the definition of chain rule.")
                             fout_error.write(
                                 f"Error: Rule {input_rule} does not conform to the definition of chain rule.\n")
                             num_error = num_error + 1
@@ -1421,26 +1528,31 @@ def clean_rules_for_unknown(summarized_file_path, all_rels, relation_regex, fout
             if is_check is True:
                 if all(time_squeque[i] <= time_squeque[i + 1] for i in range(len(time_squeque) - 1)) is False:
                     print(f"Error: Rule {input_rule} time_squeque is error.")
-                    fout_error.write(f"Error: Rule {input_rule} time_squeque is error.\n")
+                    fout_error.write(
+                        f"Error: Rule {input_rule} time_squeque is error.\n")
                     num_error = num_error + 1
                     is_save = False
                 elif final_time < time_squeque[-1]:
                     print(f"Error: Rule {input_rule} time_squeque is error.")
-                    fout_error.write(f"Error: Rule {input_rule} time_squeque is error.\n")
+                    fout_error.write(
+                        f"Error: Rule {input_rule} time_squeque is error.\n")
                     num_error = num_error + 1
                     is_save = False
 
             if is_save:
-                correct_rule = '&'.join(rule_list).strip().replace('&', '<-', 1)
+                correct_rule = '&'.join(
+                    rule_list).strip().replace('&', '<-', 1)
                 cleaned_rules.append(correct_rule)
                 fout_suc.write(correct_rule + '\n')
                 num_suc = num_suc + 1
 
         except Exception as e:
             print(f"Processing {input_rule} failed.\n Error: {str(e)}")
-            fout_error.write(f"Processing {input_rule} failed.\n Error: {str(e)}\n")
+            fout_error.write(
+                f"Processing {input_rule} failed.\n Error: {str(e)}\n")
             num_error = num_error + 1
     return cleaned_rules, num_error, num_suc
+
 
 def clean_rules(summarized_file_path, all_rels, relation_regex, fout_error, fout_suc):
     """
@@ -1473,23 +1585,29 @@ def clean_rules(summarized_file_path, all_rels, relation_regex, fout_error, fout
                     timestamp = match[4].strip()
 
                     if timestamp[1:].isdigit() is False:
-                        print(f"Error: Rule {input_rule}:{timestamp} is not digit")
-                        fout_error.write(f"Error: Rule {input_rule}:{timestamp} is not digit\n")
+                        print(
+                            f"Error: Rule {input_rule}:{timestamp} is not digit")
+                        fout_error.write(
+                            f"Error: Rule {input_rule}:{timestamp} is not digit\n")
                         num_error = num_error + 1
                         is_save = False
                         break
 
                     if relation_name not in all_rels:
-                        best_match = get_close_matches(relation_name, all_rels, n=1)
+                        best_match = get_close_matches(
+                            relation_name, all_rels, n=1)
                         if not best_match:
-                            print(f"Cannot correctify this rule, head not in relation:{input_rule}\n")
-                            fout_error.write(f"Cannot correctify this rule, head not in relation:{input_rule}\n")
+                            print(
+                                f"Cannot correctify this rule, head not in relation:{input_rule}\n")
+                            fout_error.write(
+                                f"Cannot correctify this rule, head not in relation:{input_rule}\n")
                             is_save = False
                             num_error = num_error + 1
                             break
                         relation_name = best_match[0].strip()
 
-                    rule_list.append(f'{relation_name}({subject},{object},{timestamp})')
+                    rule_list.append(
+                        f'{relation_name}({subject},{object},{timestamp})')
 
                     if idx == 0:
                         head_subject = subject
@@ -1504,7 +1622,8 @@ def clean_rules(summarized_file_path, all_rels, relation_regex, fout_error, fout
                         if last_subject == subject:
                             last_subject = object
                         else:
-                            print(f"Error: Rule {input_rule} does not conform to the definition of chain rule.")
+                            print(
+                                f"Error: Rule {input_rule} does not conform to the definition of chain rule.")
                             fout_error.write(
                                 f"Error: Rule {input_rule} does not conform to the definition of chain rule.\n")
                             num_error = num_error + 1
@@ -1515,7 +1634,8 @@ def clean_rules(summarized_file_path, all_rels, relation_regex, fout_error, fout
 
                     if idx == len(regrex_list) - 1:
                         if last_subject != final_object:
-                            print(f"Error: Rule {input_rule} does not conform to the definition of chain rule.")
+                            print(
+                                f"Error: Rule {input_rule} does not conform to the definition of chain rule.")
                             fout_error.write(
                                 f"Error: Rule {input_rule} does not conform to the definition of chain rule.\n")
                             num_error = num_error + 1
@@ -1531,60 +1651,91 @@ def clean_rules(summarized_file_path, all_rels, relation_regex, fout_error, fout
 
             if all(time_squeque[i] <= time_squeque[i + 1] for i in range(len(time_squeque) - 1)) is False:
                 print(f"Error: Rule {input_rule} time_squeque is error.")
-                fout_error.write(f"Error: Rule {input_rule} time_squeque is error.\n")
+                fout_error.write(
+                    f"Error: Rule {input_rule} time_squeque is error.\n")
                 num_error = num_error + 1
                 is_save = False
             elif final_time < time_squeque[-1]:
                 print(f"Error: Rule {input_rule} time_squeque is error.")
-                fout_error.write(f"Error: Rule {input_rule} time_squeque is error.\n")
+                fout_error.write(
+                    f"Error: Rule {input_rule} time_squeque is error.\n")
                 num_error = num_error + 1
                 is_save = False
 
             if is_save:
-                correct_rule = '&'.join(rule_list).strip().replace('&', '<-', 1)
+                correct_rule = '&'.join(
+                    rule_list).strip().replace('&', '<-', 1)
                 cleaned_rules.append(correct_rule)
                 fout_suc.write(correct_rule + '\n')
                 num_suc = num_suc + 1
 
         except Exception as e:
             print(f"Processing {input_rule} failed.\n Error: {str(e)}")
-            fout_error.write(f"Processing {input_rule} failed.\n Error: {str(e)}\n")
+            fout_error.write(
+                f"Processing {input_rule} failed.\n Error: {str(e)}\n")
             num_error = num_error + 1
     return cleaned_rules, num_error, num_suc
 
+
 def parse_arguments():
-    parser = argparse.ArgumentParser(description="KGC rule generation parameters")
-    parser.add_argument("--data_path", type=str, default="datasets", help="Data directory")
-    parser.add_argument("--dataset", type=str, default="family", help="Dataset name")
-    parser.add_argument("--sampled_paths", type=str, default="sampled_path", help="Sampled path directory")
-    parser.add_argument("--prompt_paths", type=str, default="prompt", help="Sampled path directory")
-    parser.add_argument("--rule_path", type=str, default="gen_rules_iteration", help="Path to rule file")
-    parser.add_argument("--model_name", type=str, default="gpt-3.5-turbo", help="Model name")
-    parser.add_argument("--is_zero", action="store_true", help="Enable zero-shot rule generation")
-    parser.add_argument("-k", type=int, default=0, help="Number of generated rules, 0 denotes as much as possible")
+    parser = argparse.ArgumentParser(
+        description="KGC rule generation parameters")
+    parser.add_argument("--data_path", type=str,
+                        default="datasets", help="Data directory")
+    parser.add_argument("--dataset", type=str,
+                        default="family", help="Dataset name")
+    parser.add_argument("--sampled_paths", type=str,
+                        default="sampled_path", help="Sampled path directory")
+    parser.add_argument("--prompt_paths", type=str,
+                        default="prompt", help="Sampled path directory")
+    parser.add_argument("--rule_path", type=str,
+                        default="gen_rules_iteration", help="Path to rule file")
+    parser.add_argument("--model_name", type=str,
+                        default="gpt-3.5-turbo", help="Model name")
+    parser.add_argument("--is_zero", action="store_true",
+                        help="Enable zero-shot rule generation")
+    parser.add_argument("-k", type=int, default=0,
+                        help="Number of generated rules, 0 denotes as much as possible")
     parser.add_argument("-f", type=int, default=5, help="Few-shot number")
     parser.add_argument("-topk", type=int, default=20, help="Top-k paths")
     parser.add_argument("-n", type=int, default=5, help="Number of threads")
-    parser.add_argument("-l", type=int, default=3, help="Sample times for generating k rules")
-    parser.add_argument("--prefix", type=str, default="", help="Prefix for files")
+    parser.add_argument("-l", type=int, default=3,
+                        help="Sample times for generating k rules")
+    parser.add_argument("--prefix", type=str, default="",
+                        help="Prefix for files")
     parser.add_argument("--dry_run", action="store_true", help="Dry run mode")
-    parser.add_argument("--is_rel_name", type=str_to_bool, default='yes', help="Enable relation names")
-    parser.add_argument("--select_with_confidence", type=str_to_bool, default='no', help="Select with confidence")
-    parser.add_argument('--clean_only', action='store_true', help='Load summarized rules and clean rules only')
-    parser.add_argument('--force_summarize', action='store_true', help='Force summarize rules')
-    parser.add_argument("--is_merge", type=str_to_bool, default='no', help="Enable merge")
-    parser.add_argument("--transition_distr", type=str, default="exp", help="Transition distribution")
-    parser.add_argument("--is_only_with_original_rules", type=str_to_bool, default='no', help="Use only original rules")
-    parser.add_argument("--is_high", type=str_to_bool, default='No', help="Enable high mode")
-    parser.add_argument("--min_conf", type=float, default=0.01, help="Minimum confidence")
-    parser.add_argument("--num_iter", type=int, default=2, help="Number of iterations")
-    parser.add_argument("-second", type=int, default=3, help="Second sampling times for generating k rules")
-    parser.add_argument("--bgkg", type=str, default="valid", choices=['train', 'train_valid', 'valid', 'test'], help="Background knowledge graph")
-    parser.add_argument("--based_rule_type", type=str, default='low', choices=['low', 'high'], help="Base rule type")
-    parser.add_argument("--rule_domain", type=str, default='iteration', choices=['iteration', 'high', 'all'], help="Rule domain")
+    parser.add_argument("--is_rel_name", type=str_to_bool,
+                        default='yes', help="Enable relation names")
+    parser.add_argument("--select_with_confidence", type=str_to_bool,
+                        default='no', help="Select with confidence")
+    parser.add_argument('--clean_only', action='store_true',
+                        help='Load summarized rules and clean rules only')
+    parser.add_argument('--force_summarize',
+                        action='store_true', help='Force summarize rules')
+    parser.add_argument("--is_merge", type=str_to_bool,
+                        default='no', help="Enable merge")
+    parser.add_argument("--transition_distr", type=str,
+                        default="exp", help="Transition distribution")
+    parser.add_argument("--is_only_with_original_rules",
+                        type=str_to_bool, default='no', help="Use only original rules")
+    parser.add_argument("--is_high", type=str_to_bool,
+                        default='No', help="Enable high mode")
+    parser.add_argument("--min_conf", type=float,
+                        default=0.01, help="Minimum confidence")
+    parser.add_argument("--num_iter", type=int, default=2,
+                        help="Number of iterations")
+    parser.add_argument("-second", type=int, default=3,
+                        help="Second sampling times for generating k rules")
+    parser.add_argument("--bgkg", type=str, default="valid", choices=[
+                        'train', 'train_valid', 'valid', 'test'], help="Background knowledge graph")
+    parser.add_argument("--based_rule_type", type=str, default='low',
+                        choices=['low', 'high'], help="Base rule type")
+    parser.add_argument("--rule_domain", type=str, default='iteration',
+                        choices=['iteration', 'high', 'all'], help="Rule domain")
 
     args, _ = parser.parse_known_args()
     return args, parser
+
 
 if __name__ == "__main__":
     args, parser = parse_arguments()
